@@ -198,27 +198,26 @@ if (!file_exists(MODEL_PATH )) { mkDirectory(MODEL_PATH); }
 if (!file_exists(DBTABLE_PATH)) { mkDirectory(DBTABLE_PATH); }
 if (!file_exists(MAPPER_PATH)) { mkDirectory(MAPPER_PATH); }
 
-// convert mysql types into php
-$array_convert_types = array (
-	'int' => array ('TINYINT', 'SMALLINT', 'MEDIUMINT', 'INT', 'BIGINT', 'BIT',  'SERIAL'),
-	'decimal' => array('DECIMAL', 'FLOAT', 'DOUBLE', 'REAL'),
-	'bool' => array('BOOLEAN'),
-	'date' => array('DATE', 'DATETIME', 'TIMESTAMP', 'TIME', 'YEAR'),
-	'string' => array('CHAR', 'VARCHAR', 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'BINARY', 'VARBINARY', 'TINYBLOB', 'MEDIUMBLOB',	'BLOB',	'LONGBLOB',	'ENUM',	'SET'),
-	'spatial' => array('GEOMETRY', 'POINT', 'LINESTRING', 'POLYGON', 'MULTIPOINT', 'MULTILINESTRING', 'MULTIPOLYGON', 'GEOMETRYCOLLECTION')
-);
-
-function normalize_column_name($column_name) {
+function normalize_name($column_name) {
 	$exclude = array('_' => ' ', '-'=>' ', '.'=>' ');
 	$tmp = ucwords(strtr($column_name, $exclude));
 
 	return str_replace(' ', '',$tmp);
 }
 
-function get_type_php ($needle, $haystack, $strict = FALSE) {	
+// convert mysql types into php
+function get_type_php ($needle) {	
+	$array_convert_types = array (
+		'int' => array ('TINYINT', 'SMALLINT', 'MEDIUMINT', 'INT', 'BIGINT', 'BIT',  'SERIAL'),
+		'decimal' => array('DECIMAL', 'FLOAT', 'DOUBLE', 'REAL'),
+		'bool' => array('BOOLEAN'),
+		'date' => array('DATE', 'DATETIME', 'TIMESTAMP', 'TIME', 'YEAR'),
+		'string' => array('CHAR', 'VARCHAR', 'TINYTEXT', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'BINARY', 'VARBINARY', 'TINYBLOB', 'MEDIUMBLOB',	'BLOB',	'LONGBLOB',	'ENUM',	'SET'),
+		'spatial' => array('GEOMETRY', 'POINT', 'LINESTRING', 'POLYGON', 'MULTIPOINT', 'MULTILINESTRING', 'MULTIPOLYGON', 'GEOMETRYCOLLECTION')
+	);
 	$key = '';
-	foreach ($haystack as $k => $v) {
-		if (in_array($needle, $v, $strict)) {
+	foreach ($array_convert_types as $k => $v) {
+		if (in_array($needle, $v)) {
 			$key = $k;
 			return $key;
 		}
@@ -291,18 +290,18 @@ try
 		$create_table_result = $create_table_pdo->fetchAll(PDO::FETCH_ASSOC);
 		$create_table_result = $create_table_result[0];	// array_values ???
 	
-		$model_content .= normalize_column_name($table_name) . PHP_EOL . "{" . PHP_EOL ;
-		$mapper_content .= normalize_column_name($table_name) . PHP_EOL . "{" . PHP_EOL ;
+		$model_content .= normalize_name($table_name) . PHP_EOL . "{" . PHP_EOL ;
+		$mapper_content .= normalize_name($table_name) . PHP_EOL . "{" . PHP_EOL ;
 
 		// the mapper's table name
 		$mapper_content .= "\tconst TABLE_NAME = '$table_name';" . PHP_EOL;
 		
 		$mapper_constants_list = "";
 		
-		$objectToRow_comment = generate_doc_comment(array('param'=> 'Model_' .  normalize_column_name($table_name) . ' $' . $table_name, 'return'=>'$row'));
-		$objectToRow_content = $objectToRow_comment . "\t" . 'public function objectToRow(Model_' . normalize_column_name($table_name) . ' $' . $table_name .  ')' . PHP_EOL . "\t{" . PHP_EOL;
+		$objectToRow_comment = generate_doc_comment(array('param'=> 'Model_' .  normalize_name($table_name) . ' $' . $table_name, 'return'=>'$row'));
+		$objectToRow_content = $objectToRow_comment . "\t" . 'public function objectToRow(Model_' . normalize_name($table_name) . ' $' . $table_name .  ')' . PHP_EOL . "\t{" . PHP_EOL;
 		
-		$rowToObject_comment = generate_doc_comment(array('param'=>'$row', 'return'=> 'Model_' .  normalize_column_name($table_name) . ' $' . $table_name));
+		$rowToObject_comment = generate_doc_comment(array('param'=>'$row', 'return'=> 'Model_' .  normalize_name($table_name) . ' $' . $table_name));
 		$rowToObject_content = $rowToObject_comment . "\t" . 'public function rowToObject ($row)' . PHP_EOL . "\t{" . PHP_EOL;
 		$rowToObject_content .= "\t\t".'$user = new $this->entityClassName;' . PHP_EOL;
 		foreach ( $table_desc[$table_name]['rowToObject_foreign_content'] as $row) {
@@ -352,14 +351,14 @@ try
 	 					$referenced_columns_list .= strlen($referenced_columns_list) > 0 ? ", '$referenced_column'" : "'$referenced_column'" ;
 	 					$referenced_tables_list .= strlen($referenced_tables_list) > 0 ? ", '$referenced_table_name'" : "'$referenced_table_name'" ;
 	 					
-	  					$model_dbtables_list .= strlen($model_dbtables_list) > 0 ? ", 'Model_DbTable_" . normalize_column_name($referenced_table_name) . "'" : "'Model_DbTable_" . normalize_column_name($referenced_table_name) . "'" ;
+	  					$model_dbtables_list .= strlen($model_dbtables_list) > 0 ? ", 'Model_DbTable_" . normalize_name($referenced_table_name) . "'" : "'Model_DbTable_" . normalize_name($referenced_table_name) . "'" ;
 	 					array_push($references_test[$table_name], array('referenced_columns_list' => $referenced_columns_list, 'model_dbtables_list' => $model_dbtables_list, 'referenced_table_name' => $referenced_table_name, 'foreign_keys_list' => $foreign_keys_list));
 	 					
 	 					$dependent_table_list[$referenced_table_name] = array();
 						$table_has_dependences[$referenced_table_name] = array();
 	
 	 					array_push($table_has_dependences[$referenced_table_name], $table_name); 					
-	 					array_push($dependent_table_list[$referenced_table_name], 'Model_DbTable_' . normalize_column_name($table_name));
+	 					array_push($dependent_table_list[$referenced_table_name], 'Model_DbTable_' . normalize_name($table_name));
  					}
 				}
 			}
@@ -368,13 +367,13 @@ try
 			if ($foreign_key == $v['Field']) {
 				if (isset($referenced_table_name)) {
 					//private variable comment
-					$php_type = "Model_" . normalize_column_name($referenced_table_name);
+					$php_type = "Model_" . normalize_name($referenced_table_name);
 					
 					//private variable name
 					$private_variable = $referenced_table_name;
 				
-					$rowToObject_foreign_content = "\t\t$" . $private_variable . 'Row = $row->findParentRow(\'Model_DbTable_' . normalize_column_name($private_variable) . '\', \'' . $foreign_key_name . '\');' .PHP_EOL  ;
-					$rowToObject_foreign_content .= "\t\t$" . $private_variable . 'Mapper = new Model_Mapper_' . normalize_column_name($private_variable) . '();' .PHP_EOL;
+					$rowToObject_foreign_content = "\t\t$" . $private_variable . 'Row = $row->findParentRow(\'Model_DbTable_' . normalize_name($private_variable) . '\', \'' . $foreign_key_name . '\');' .PHP_EOL  ;
+					$rowToObject_foreign_content .= "\t\t$" . $private_variable . 'Mapper = new Model_Mapper_' . normalize_name($private_variable) . '();' .PHP_EOL;
 					$rowToObject_foreign_content .= "\t\t$" . $private_variable . ' = $' . $private_variable . 'Mapper->rowToObject($'. $private_variable .'Row);' .PHP_EOL;
 
 					array_push($table_desc[$table_name]['rowToObject_foreign_content'], $rowToObject_foreign_content);
@@ -384,10 +383,10 @@ try
 			} else {
 				//private variable comment
 				$type_str = (strstr($v['Type'], '(', true)) ? strstr($v['Type'], '(', true) : $v['Type'];			
-				$php_type = get_type_php(strtoupper($type_str), $array_convert_types);
+				$php_type = get_type_php(strtoupper($type_str));
 				
 				//private variable name
-				$private_variable = lcfirst(normalize_column_name($v['Field']));
+				$private_variable = lcfirst(normalize_name($v['Field']));
 			}
 
 			// generate model documentation comment like /** *@var type */
@@ -419,14 +418,14 @@ try
  			$objectToRow_content .= "\t\t" . '$row[self::COL_' . strtoupper($v['Field']) . '] = $' . $table_name . '->get' . ucfirst($private_variable) . '()';
  			
  			if ( isset ($referenced_column) && isset ($referenced_table_name) && $private_variable == $referenced_table_name ) {
- 				$objectToRow_content .= '->get' . normalize_column_name( $referenced_column ) . '()';
+ 				$objectToRow_content .= '->get' . normalize_name( $referenced_column ) . '()';
  			}
  			
  			$objectToRow_content .= ';' . PHP_EOL;
  			
- 			$rowToObject_content .= "\t\t\t\t" . '->set' . normalize_column_name( $v['Field'] ) . '($row[self::COL_' . strtoupper($v['Field']) .'])' . PHP_EOL;
+ 			$rowToObject_content .= "\t\t\t\t" . '->set' . normalize_name( $v['Field'] ) . '($row[self::COL_' . strtoupper($v['Field']) .'])' . PHP_EOL;
  			if ( isset ($referenced_column) && isset ($referenced_table_name) && $private_variable == $referenced_table_name ) {
- 				$rowToObject_content .= "\t\t\t\t" . '->set' . normalize_column_name( $referenced_column ) . '($' . $referenced_column . ')' . PHP_EOL;
+ 				$rowToObject_content .= "\t\t\t\t" . '->set' . normalize_name( $referenced_column ) . '($' . $referenced_column . ')' . PHP_EOL;
  			}
  			
 		} 
@@ -442,17 +441,17 @@ try
 		$mapper_content .= $mapper_constants_list;
 		
 		// mapper private variables
-		$mapper_content .= generate_doc_comment(array('var' => 'Model_DbTable_' . normalize_column_name($table_name)));
+		$mapper_content .= generate_doc_comment(array('var' => 'Model_DbTable_' . normalize_name($table_name)));
 		$mapper_content .= "\t" . 'private $dbTable;' . PHP_EOL;
 		
 		$mapper_content .= generate_doc_comment(array('var' => 'string'));
-		$mapper_content .= "\t" . 'private $tableClassName = \'Model_DbTable_' . normalize_column_name($table_name) . "';" . PHP_EOL;
+		$mapper_content .= "\t" . 'private $tableClassName = \'Model_DbTable_' . normalize_name($table_name) . "';" . PHP_EOL;
 		
 		$mapper_content .= generate_doc_comment(array('var' => 'string'));
-		$mapper_content .= "\t" . 'private $entityClassName = \'Model_' . normalize_column_name($table_name) . "';" . PHP_EOL;
+		$mapper_content .= "\t" . 'private $entityClassName = \'Model_' . normalize_name($table_name) . "';" . PHP_EOL;
 				
 		// mapper getDbTable function
-		$mapper_content .= generate_doc_comment(array('return' => 'Model_DbTable_' . normalize_column_name($table_name)));
+		$mapper_content .= generate_doc_comment(array('return' => 'Model_DbTable_' . normalize_name($table_name)));
 		$mapper_content .= "\t" . 'public function getDbTable()' . PHP_EOL . "\t{" . PHP_EOL;
 		$mapper_content .= "\t\t" . 'if (null === $this->dbTable) {' . PHP_EOL;
 		$mapper_content .= "\t\t\t" . '$this->dbTable = new $this->tableClassName;' . PHP_EOL . "\t\t}" . PHP_EOL;
@@ -487,7 +486,7 @@ try
  	
  	foreach ($table_names as $table_name) {
  
- 		$dbtable_content .= normalize_column_name($table_name) . " extends Zend_Db_Table_Abstract"  . PHP_EOL . "{" . PHP_EOL ;
+ 		$dbtable_content .= normalize_name($table_name) . " extends Zend_Db_Table_Abstract"  . PHP_EOL . "{" . PHP_EOL ;
 
  		// the table name / primary key as protected variables
  		$dbtable_content .= "\tprotected $" . "_name = '" . $table_name . "';" . PHP_EOL;
