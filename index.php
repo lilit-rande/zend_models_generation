@@ -213,6 +213,53 @@ function generate_doc_comment($desc_array, $message = "") {
 	$comment_string .= "\t" . ' */' . PHP_EOL;
 	return $comment_string;
 }
+
+/*
+$matches_pk = array();
+
+$str = "CREATE TABLE `project_needs_skill` (
+`id_project_needs_skill` int(11) NOT NULL,
+`project_id_project` int(11) NOT NULL,
+`skill_id_skill` int(11) NOT NULL,
+`date_insert` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+`date_update` datetime NOT NULL,
+PRIMARY KEY (`id_project_needs_skill`),
+KEY `fk_project_needs_skill_project1_idx` (`project_id_project`),
+KEY `fk_project_needs_skill_skill1_idx` (`skill_id_skill`),
+KEY `date_insert` (`date_insert`),
+KEY `date_update` (`date_update`),
+CONSTRAINT `fk_project_needs_skill_project1` FOREIGN KEY (`project_id_project`) REFERENCES `project` (`id_project`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+CONSTRAINT `fk_project_needs_skill_skill1` FOREIGN KEY (`skill_id_skill`) REFERENCES `skill` (`id_skill`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB DEFAULT CHARSET=utf8
+)";
+
+$pat = "/CONSTRAINT\s?\`([^\`]*)\`\s?FOREIGN KEY\s?\(\`([^\`]*)\`\)\s?REFERENCES\s?\`([^\`]*)\` \(\`([^\`]*)\`\)/";
+
+preg_match_all($pat, $str, $matches_pk);
+
+echo '<pre>';
+print_r($matches_pk);
+echo '</pre>';
+
+if ( count($matches_pk[0]) > 0 ) {
+
+}
+
+
+	 					if (count($matches) > 0) {
+	 						$table_desc[$table_name]['foreign_key'] = array();
+	 						
+		 					$foreign_key_name = $matches[1];
+		 					$foreign_key = $matches[2];
+		 					$referenced_table_name = $matches[3];
+		 					$referenced_column = $matches[4];
+		 					
+		 					$references[$table_name]['foreign_key_name'] = $foreign_key_name;
+		 					$references[$table_name]['foreign_key_value'] = $foreign_key;
+		 					$references[$table_name]['referenced_table_name'] = $referenced_table_name;
+		 					$references[$table_name]['referenced_column'] = $referenced_column;
+ */
+
 if (isset($_POST['submit'])) {
 
 	$message = "";
@@ -262,24 +309,15 @@ if (isset($_POST['submit'])) {
 		$mapper_content = "&lt;?php" . PHP_EOL . "class Model_Mapper_";
 		
 		$matches = array();
-		$matches_fk = array();
-		
-		$pdo_select = "";
-		$pdo_from = "";
-		$pdo_where = "";
 		
 		$primary_key = "";
 		$foreign_key = "";
 		$references_test = array();
 
 		$references = array();
-		
-		$referenced_table_name = "";
-		$referenced_column = "";
-		
-		$table_has_dependences = array();
-		$dependent_table_list = array();
-		
+		$dependences = array();
+		$table_desc = array();
+
 		// generate table names array
 		foreach ($tables as $table) {
 			$name = $table[0];
@@ -288,196 +326,87 @@ if (isset($_POST['submit'])) {
 		
 		// get each db table description
 		foreach ($table_names as $table_name) {
-			$table_desc[$table_name]['rowToObject_foreign_content'] = array();
-			$foreign_keys_list = "";
-			$referenced_columns_list = "";
-			$referenced_tables_list = "";
-			$model_dbtables_list = "";		
-			
-			$hasReferences = false;
-			$hasDependences = false;
-			
+
+			$table_desc[$table_name]['primary'] = array();
+			$table_desc[$table_name]['columns'] = array();
+
 			$desc  = $pdo->query("DESCRIBE $table_name");
 			
 			$create_table_pdo = $pdo->query("SHOW CREATE TABLE $table_name");
 			$create_table_result = $create_table_pdo->fetchAll(PDO::FETCH_ASSOC);
 			$create_table_result = $create_table_result[0];	// array_values ???
 		
-			$model_content .= normalize_name($table_name) . PHP_EOL . "{" . PHP_EOL ;
-			$mapper_content .= normalize_name($table_name) . PHP_EOL . "{" . PHP_EOL ;
-
-			// the mapper's table name
-			$mapper_content .= "\tconst TABLE_NAME = '$table_name';" . PHP_EOL;
-			
-			$mapper_constants_list = "";
-			
-			$objectToRow_comment = generate_doc_comment(array('param'=> 'Model_' .  normalize_name($table_name) . ' $' . $table_name, 'return'=>'$row'));
-			$objectToRow_content = $objectToRow_comment . "\t" . 'public function objectToRow(Model_' . normalize_name($table_name) . ' $' . $table_name .  ')' . PHP_EOL . "\t{" . PHP_EOL;
-			
-			$rowToObject_comment = generate_doc_comment(array('param'=>'$row', 'return'=> 'Model_' .  normalize_name($table_name) . ' $' . $table_name));
-			$rowToObject_content = $rowToObject_comment . "\t" . 'public function rowToObject ($row)' . PHP_EOL . "\t{" . PHP_EOL;
-			$rowToObject_content .= "\t\t".'$user = new $this->entityClassName;' . PHP_EOL;
-			foreach ( $table_desc[$table_name]['rowToObject_foreign_content'] as $row) {
-				$rowToObject_content .= $row;
-			}
-			$rowToObject_content .= "\t\t".'$user';		
-				
-			
 			foreach ($desc as $k => $v) {
+
+				// echo '<pre>';
+				// echo 'table_name = ' . $table_name . '<br>';
+				// print_r($v);
+				// echo '</pre>';
+			
 				if ($v['Key'] == 'PRI' ) {
 					$primary_key = $v['Field'];
-					$table_desc[$table_name]['primary'] = $primary_key;
+					array_push($table_desc[$table_name]['primary'], $primary_key);
 				}
-				
-				if ($v['Key'] == 'MUL') {
-					$hasReferences = true;
+				else if ($v['Key'] == 'MUL') {
+
 					$references[$table_name] = array();
 					
-					$foreign_key = $v['Field'];
-					$foreign_keys_list .= strlen($foreign_keys_list) > 0 ? ", '$foreign_key'" : "'$foreign_key'" ;
+					// $foreign_key = $v['Field'];
+					// $foreign_keys_list .= strlen($foreign_keys_list) > 0 ? ", '$foreign_key'" : "'$foreign_key'" ;
 				
 					if($create_table_result['Table'] == $table_name) {					
 	 					$subject = $create_table_result['Create Table']; 
 	 			
 	 					// foreign key names 
-	 					$p = "/CONSTRAINT\s?\`([^\`]*)\`\s?FOREIGN KEY\s?\(\`([^\`]*)\`\)\s?REFERENCES\s?\`([^\`]*)\` \(\`([^\`]*)\`\)/";
+	 					$pattern = "/CONSTRAINT\s?\`([^\`]*)\`\s?FOREIGN KEY\s?\(\`([^\`]*)\`\)\s?REFERENCES\s?\`([^\`]*)\` \(\`([^\`]*)\`\)/";
 	 					//CONSTRAINT `fk_member_has_skill_member1` FOREIGN KEY (`id_member`) REFERENCES `member` (`id_member`) ON DELETE NO ACTION ON UPDATE NO ACTION,
 	 					
 	 					// matches[1] = for_key_name, matches[2] = for_key_column_name, matches[3]=referenced table name, matches[4] = referenced column name
-	 					preg_match($p, $subject, $matches); 	
-	 					 					
-	 					if (count($matches) > 0) {
-	 						$table_desc[$table_name]['foreign_key'] = array();
-	 						
-		 					$foreign_key_name = $matches[1];
-		 					$foreign_key = $matches[2];
-		 					$referenced_table_name = $matches[3];
-		 					$referenced_column = $matches[4];
-		 					
-		 					$references[$table_name]['foreign_key_name'] = $foreign_key_name;
-		 					$references[$table_name]['foreign_key_value'] = $foreign_key;
-		 					$references[$table_name]['referenced_table_name'] = $referenced_table_name;
-		 					$references[$table_name]['referenced_column'] = $referenced_column;
-		 					
-		 					array_push($table_desc[$table_name]['foreign_key'], $foreign_key_name);
-		 					
-		 					$referenced_columns_list .= strlen($referenced_columns_list) > 0 ? ", '$referenced_column'" : "'$referenced_column'" ;
-		 					$referenced_tables_list .= strlen($referenced_tables_list) > 0 ? ", '$referenced_table_name'" : "'$referenced_table_name'" ;
-		 					
-		  					$model_dbtables_list .= strlen($model_dbtables_list) > 0 ? ", 'Model_DbTable_" . normalize_name($referenced_table_name) . "'" : "'Model_DbTable_" . normalize_name($referenced_table_name) . "'" ;
-		 					array_push($references_test[$table_name], array('referenced_columns_list' => $referenced_columns_list, 'model_dbtables_list' => $model_dbtables_list, 'referenced_table_name' => $referenced_table_name, 'foreign_keys_list' => $foreign_keys_list));
-		 					
-		 					$dependent_table_list[$referenced_table_name] = array();
-							$table_has_dependences[$referenced_table_name] = array();
-		
-		 					array_push($table_has_dependences[$referenced_table_name], $table_name); 					
-		 					array_push($dependent_table_list[$referenced_table_name], 'Model_DbTable_' . normalize_name($table_name));
-	 					}
-					}
-				}
+	 					preg_match_all($pattern, $subject, $matches);
+	 					
+	 					$count = count($matches[0]);
+	 					if ($count > 0) {
 
-				// models generation							
-				if ($foreign_key == $v['Field']) {
-					if (isset($referenced_table_name)) {
-						//private variable comment
-						$php_type = "Model_" . normalize_name($referenced_table_name);
-						
-						//private variable name
-						$private_variable = $referenced_table_name;
-					
-						$rowToObject_foreign_content = "\t\t$" . $private_variable . 'Row = $row->findParentRow(\'Model_DbTable_' . normalize_name($private_variable) . '\', \'' . $foreign_key_name . '\');' .PHP_EOL  ;
-						$rowToObject_foreign_content .= "\t\t$" . $private_variable . 'Mapper = new Model_Mapper_' . normalize_name($private_variable) . '();' .PHP_EOL;
-						$rowToObject_foreign_content .= "\t\t$" . $private_variable . ' = $' . $private_variable . 'Mapper->rowToObject($'. $private_variable .'Row);' .PHP_EOL;
+							$reference_line = array();
 
-						array_push($table_desc[$table_name]['rowToObject_foreign_content'], $rowToObject_foreign_content);
-					}
-					
-					
-				} else {
-					//private variable comment
-					$type_str = (strstr($v['Type'], '(', true)) ? strstr($v['Type'], '(', true) : $v['Type'];			
-					$php_type = get_type_php(strtoupper($type_str));
-					
-					//private variable name
-					$private_variable = lcfirst(normalize_name($v['Field']));
-				}
+	 						for ( $i = 0; $i < $count; $i++ ) {
 
-				// generate model documentation comment like /** *@var type */
-				$model_content .= generate_doc_comment( array('var'=>$php_type));
-				
-				// generate private variables
-				$model_content .= "\t" . 'private $' . $private_variable . ';' . PHP_EOL;
+	 							$foreign_key_name = $matches[1][$i];
+	 							$foreign_key = $matches[2][$i];
+	 							$referenced_table_name = $matches[3][$i];
+	 							$referenced_column = $matches[4][$i];
 
-				// generate model getters
-				$model_content .= generate_doc_comment( array ('return '=>$private_variable));	// comment
-				$model_content .= "\t" . 'public function get' . ucfirst($private_variable) . '()' .PHP_EOL ;	
-	 			$model_content .= "\t" . '{' . PHP_EOL;
-	 			$model_content .= "\t\t" . 'return $this->' . $private_variable . ';' . PHP_EOL;
-	 			$model_content .= "\t" . '}' . PHP_EOL;
-				
-	 			// generate model setters
-	 			$model_content .= generate_doc_comment(array ('param ' => $php_type . ' ' . $private_variable));
-	 			$model_content .= "\t" . 'public function set' . ucfirst($private_variable) .'($' . $private_variable . ')' . PHP_EOL;
-	 			$model_content .= "\t" . '{' . PHP_EOL;
-	 			$model_content .= "\t\t" . '$this->' . $private_variable .' = $' .$private_variable . ';' . PHP_EOL;
-	 			$model_content .= "\t\t" . 'return $this;' . PHP_EOL;
-	 			$model_content .= "\t" . '}' . PHP_EOL;
-	 			
-	 			//mapper's generation
-	 			// mapper's constants and private variables generation	
-	 			$mapper_constants_list .= "\tconst COL_" . strtoupper($v['Field']) . " = '" . $v['Field'] . "';" . PHP_EOL;
-	 	
-	 			//objectToRow generation
-	 			$objectToRow_content .= "\t\t" . '$row[self::COL_' . strtoupper($v['Field']) . '] = $' . $table_name . '->get' . ucfirst($private_variable) . '()';
-	 			
-	 			if ( isset ($referenced_column) && isset ($referenced_table_name) && $private_variable == $referenced_table_name ) {
-	 				$objectToRow_content .= '->get' . normalize_name( $referenced_column ) . '()';
-	 			}
-	 			
-	 			$objectToRow_content .= ';' . PHP_EOL;
-	 			
-	 			$rowToObject_content .= "\t\t\t\t" . '->set' . normalize_name( $v['Field'] ) . '($row[self::COL_' . strtoupper($v['Field']) .'])' . PHP_EOL;
-	 			if ( isset ($referenced_column) && isset ($referenced_table_name) && $private_variable == $referenced_table_name ) {
-	 				$rowToObject_content .= "\t\t\t\t" . '->set' . normalize_name( $referenced_column ) . '($' . $referenced_column . ')' . PHP_EOL;
-	 			}
-	 			
+	 							$reference_line['foreign_key_name'] = $foreign_key_name;
+	 							$reference_line['foreign_key'] = $foreign_key;
+	 							$reference_line['referenced_table_name'] = $referenced_table_name;
+	 							$reference_line['referenced_column'] = $referenced_column;
+
+	 							if (isset($matches[5]) && isset($matches[6])) {
+	 								$reference_line[$matches[5]] = $matches[5][$i];	// ON DELETE / ON UPDATE
+	 								$reference_line[$matches[6]] = $matches[6][$i];
+	 							}
+
+	 							if (isset($matches[7]) && isset($matches[8])) {
+	 								$reference_line[$matches[7]] = $matches[7][$i];	// ON DELETE / ON UPDATE
+	 								$reference_line[$matches[8]] = $matches[8][$i];
+	 							}
+	 							array_push($references[$table_name], $reference_line);
+
+	 							$dependences[$referenced_table_name] = array();
+	 							array_push($dependences[$referenced_table_name], $table_name);
+
+	 							if (! in_array($referenced_table_name, $table_desc[$table_name]['columns'])) {
+		 							array_push($table_desc[$table_name]['columns'], $referenced_table_name);
+		 						}
+	 						}
+	 					}	//count($matches[0]) > 0
+					}	// if($create_table_result['Table'] == $table_name)
+				}	// $v['Key'] == 'MUL'
+				else {
+					array_push($table_desc[$table_name]['columns'], $v['Field']);
+				}	
 			} 
-			
-			$f="";
-			if(isset($table_desc[$table_name]['foreign_key'])) { $f = $table_desc[$table_name]['foreign_key']; }
-			$objectToRow_content .= "\t\treturn $" . "row;" . PHP_EOL;
-			$objectToRow_content .= "\t}" . PHP_EOL;
-
-			$rowToObject_content .= ";\t\t".'return $' . $table_name . ';' .PHP_EOL;
-			$rowToObject_content .= "\t}" . PHP_EOL;
-
-			$mapper_content .= $mapper_constants_list;
-			
-			// mapper private variables
-			$mapper_content .= generate_doc_comment(array('var' => 'Model_DbTable_' . normalize_name($table_name)));
-			$mapper_content .= "\t" . 'private $dbTable;' . PHP_EOL;
-			
-			$mapper_content .= generate_doc_comment(array('var' => 'string'));
-			$mapper_content .= "\t" . 'private $tableClassName = \'Model_DbTable_' . normalize_name($table_name) . "';" . PHP_EOL;
-			
-			$mapper_content .= generate_doc_comment(array('var' => 'string'));
-			$mapper_content .= "\t" . 'private $entityClassName = \'Model_' . normalize_name($table_name) . "';" . PHP_EOL;
-					
-			// mapper getDbTable function
-			$mapper_content .= generate_doc_comment(array('return' => 'Model_DbTable_' . normalize_name($table_name)));
-			$mapper_content .= "\t" . 'public function getDbTable()' . PHP_EOL . "\t{" . PHP_EOL;
-			$mapper_content .= "\t\t" . 'if (null === $this->dbTable) {' . PHP_EOL;
-			$mapper_content .= "\t\t\t" . '$this->dbTable = new $this->tableClassName;' . PHP_EOL . "\t\t}" . PHP_EOL;
-			$mapper_content .= "\t\t" . 'return $this->dbTable;' . PHP_EOL;
-			$mapper_content .= "\t}" . PHP_EOL;
-			
-			$mapper_content .= $objectToRow_content;
-
-			$mapper_content .= $rowToObject_content;
-	//		echo $mapper_content;
-			$model_content .= "}" . PHP_EOL ;
-			$mapper_content .= "}" . PHP_EOL ;
-				
+	
 			// create files	
 	 	// 	try {	 
 			// 	$handle = file_put_contents (MODEL_PATH . DS . ucfirst($table_name) . '.php', $model_content);
@@ -491,63 +420,12 @@ if (isset($_POST['submit'])) {
 	 	// 	}
 	 	}
 	 	 	
-		//dbtables generation
-	 	$dbtable_doc_comment_params = array('category' => 'YOUR CATEGORY HERE', 'package'=>'YOUR PACKAGE NAME HERE', 'subpackage'=>'YOUR SUBPACKAGE NAME HERE', 'desc'=>'YOUR DESCRIPTION HERE', 'author'=>'YOUR NAME HERE', 'copyright'=>'COPYRIGHT', 'version'=>'YOUR APPLICATION VERSION HERE', 'date'=>'YOUR APPLICATION CREATION DATE HERE');
+				echo '<pre>';
+			
+				print_r($table_desc);
+				echo '</pre>';
 
-	 	$dbtable_doc_comment = generate_doc_comment($dbtable_doc_comment_params, "DataTable Gateway");
-	 	$dbtable_content = "<?php" . PHP_EOL . $dbtable_doc_comment . "class Model_DbTable_";
-	 	
-	 	foreach ($table_names as $table_name) {
-	 
-	 		$dbtable_content .= normalize_name($table_name) . " extends Zend_Db_Table_Abstract"  . PHP_EOL . "{" . PHP_EOL ;
 
-	 		// the table name / primary key as protected variables
-	 		$dbtable_content .= "\tprotected $" . "_name = '" . $table_name . "';" . PHP_EOL;
-	 		
-	 		// TODO for views
-	 		if (isset($table_desc[$table_name]['primary'])) {
-	 			$dbtable_content .= "\tprotected $" . "_primary = '" . $table_desc[$table_name]['primary'] . "';" . PHP_EOL;
-	 		}
-	 		
-	 		if (isset ($references_test[$table_name])) {
-	 			foreach($references_test[$table_name] as $ref_key => $ref_value){ 			
-					$dbtable_content .= "\tprotected $" . "_referenceMap = array(". PHP_EOL;
-				//	$dbtable_content .= "\t\t'FK_" . $table_name . "_" . $ref_value['referenced_table_name'] . "' => array (" . PHP_EOL;	
-					if (isset($table_desc[$table_name]['foreign_key'])) {
-						$dbtable_content .= "\t\t'" .ucfirst($table_desc[$table_name]['foreign_key']) . "' => array (" . PHP_EOL;
-					}
-					$dbtable_content .=	"\t\t\t'columns' => array(" . $ref_value['foreign_keys_list'] . ")," . PHP_EOL;
-					$dbtable_content .= "\t\t\t'refTableClass' =>" . $ref_value['model_dbtables_list'] . "," . PHP_EOL;
-					$dbtable_content .= "\t\t\t'refColumns' => array(" . $ref_value['referenced_columns_list'] . ")," . PHP_EOL;
-					 					
-					// TODO
-					$dbtable_content .= "\t\t\t'onDelete' => self::RESTRICT," . PHP_EOL;
-					$dbtable_content .= "\t\t\t'onUpdate' => self::CASCADE" . PHP_EOL;
-					 					
-					$dbtable_content .= "\t\t)". PHP_EOL;
-					$dbtable_content .= "\t);". PHP_EOL;
-	 			}
-	 		}
-	 		
-	 		if (array_key_exists($table_name, $table_has_dependences)) {
-	 			$dbtable_content .= "\tprotected $" . "_dependentTables = array('" . implode('\', \'',$table_has_dependences[$table_name]) . "');". PHP_EOL ;
-	 		}
-	 		
-	 		$dbtable_content .= '}'. PHP_EOL ;
-	 		
-	//  		echo $dbtable_content;
-	  		
-	  		// create files
-			// try {
-			// 	$handle = file_put_contents (DBTABLE_PATH . DS . ucfirst($table_name) . '.php', $dbtable_content);
-			// 	//		$handle = file_put_contents (MAPPER_PATH . DS . ucfirst($table_name) . '.php', $mapper_content);
-			// 	$dbtable_content = "<?php" . PHP_EOL . $dbtable_doc_comment . "class Model_DbTable_";
-			// }
-			// catch (Exception $e) {
-			// 		generateJSMessage('Erreur de création ou d\'écriture dans le fichier ' . $e->getMessage());
-			// 	die ();
-	 	// 	}
-	 	}
 	// 	echo $model_content;
 	}
 	catch (Exception $e)
