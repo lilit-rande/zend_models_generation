@@ -306,7 +306,7 @@ if (isset($_POST['submit'])) {
 		$table_names = array();	
 		$table_desc = array();
 		$model_content = "<?php" . PHP_EOL . "class Model_";
-		$mapper_content = "&lt;?php" . PHP_EOL . "class Model_Mapper_";
+		$mapper_content = "<?php" . PHP_EOL . "class Model_Mapper_";
 		
 		$matches = array();
 		
@@ -329,6 +329,7 @@ if (isset($_POST['submit'])) {
 
 			$table_desc[$table_name]['primary'] = array();
 			$table_desc[$table_name]['columns'] = array();
+			$table_desc[$table_name]['phpType'] = array();
 
 			$desc  = $pdo->query("DESCRIBE $table_name");
 			
@@ -343,12 +344,17 @@ if (isset($_POST['submit'])) {
 				// print_r($v);
 				// echo '</pre>';
 			//	echo $v['Field'] .'<br>';
+			
+				//	gestion des commentaires				
+				$type_str = (strstr($v['Type'], '(', true)) ? strstr($v['Type'], '(', true) : $v['Type'];
+				$phpType =  get_type_php(strtoupper($type_str));	
+
 				if ($v['Key'] == 'PRI' ) {
 					$primary_key = $v['Field'];
-					array_push($table_desc[$table_name]['primary'], $primary_key);
+					array_push($table_desc[$table_name]['primary'], lcfirst(normalize_name($primary_key)));
 				}
 				else if ($v['Key'] == 'MUL') {
-					echo '<hr>' . $v['Key'] . '<br>' . $v['Field'] . '<hr>';
+
 					$references[$table_name] = array();
 					
 					// $foreign_key = $v['Field'];
@@ -371,6 +377,7 @@ if (isset($_POST['submit'])) {
 
 	 						for ( $i = 0; $i < $count; $i++ ) {
 
+	 							// table references
 	 							$foreign_key_name = $matches[1][$i];
 	 							$foreign_key = $matches[2][$i];
 	 							$referenced_table_name = $matches[3][$i];
@@ -380,6 +387,7 @@ if (isset($_POST['submit'])) {
 	 							$reference_line['foreign_key'] = $foreign_key;
 	 							$reference_line['referenced_table_name'] = $referenced_table_name;
 	 							$reference_line['referenced_column'] = $referenced_column;
+	 							$reference_ligne['referenced_model_dbtable_name'] = "Model_DbTable_" . normalize_name($referenced_table_name);
 
 	 							if (isset($matches[5]) && isset($matches[6])) {
 	 								$reference_line[$matches[5]] = $matches[5][$i];	// ON DELETE / ON UPDATE
@@ -392,21 +400,35 @@ if (isset($_POST['submit'])) {
 	 							}
 	 							array_push($references[$table_name], $reference_line);
 
-	 							$dependences[$referenced_table_name] = array();
-	 							array_push($dependences[$referenced_table_name], $table_name);
+	 							// table dependences
+		 						$dependence_ligne = array();
+			 					$dependence_ligne['dependent_table_name'] = $table_name;
+			 					$dependence_ligne['dependent_model_dbtable_name'] = "Model_DbTable_" . normalize_name($table_name);
+			 					
+			 					if ( isset($dependences[$referenced_table_name]) ) {
+			 						if ( !in_array($dependence_ligne, $dependences[$referenced_table_name])) {
+			 							array_push($dependences[$referenced_table_name], $dependence_ligne);
+			 						}
+			 					} else {
+			 						$dependences[$referenced_table_name] = array();
+			 					}
 
+			 					// table columns
 	 							if (! in_array($referenced_table_name, $table_desc[$table_name]['columns'])) {
 		 							array_push($table_desc[$table_name]['columns'], $referenced_table_name);
+		 							array_push($table_desc[$table_name]['phpType'], "Model_" . normalize_name($referenced_table_name));
 		 						}
 	 						}
 	 					}	//count($matches[0]) > 0
 	 						if ( !in_array($v['Field'], $matches[2]) ) {	//le reste des colonnes-index : index, unique etc
-	 							array_push($table_desc[$table_name]['columns'], $v['Field']);
+	 							array_push($table_desc[$table_name]['columns'], lcfirst(normalize_name($v['Field'])));
+		 						array_push($table_desc[$table_name]['phpType'], $phpType);
 	 						}
 					}	// if($create_table_result['Table'] == $table_name)
 				}	// $v['Key'] == 'MUL'
 				else {
-					array_push($table_desc[$table_name]['columns'], $v['Field']);
+					array_push($table_desc[$table_name]['columns'], lcfirst(normalize_name($v['Field'])));
+		 			array_push($table_desc[$table_name]['phpType'], $phpType);
 				}	
 			} 
 	
