@@ -342,13 +342,13 @@ if (isset($_POST['submit'])) {
 				// echo 'table_name = ' . $table_name . '<br>';
 				// print_r($v);
 				// echo '</pre>';
-			
+			//	echo $v['Field'] .'<br>';
 				if ($v['Key'] == 'PRI' ) {
 					$primary_key = $v['Field'];
 					array_push($table_desc[$table_name]['primary'], $primary_key);
 				}
 				else if ($v['Key'] == 'MUL') {
-
+					echo '<hr>' . $v['Key'] . '<br>' . $v['Field'] . '<hr>';
 					$references[$table_name] = array();
 					
 					// $foreign_key = $v['Field'];
@@ -400,6 +400,9 @@ if (isset($_POST['submit'])) {
 		 						}
 	 						}
 	 					}	//count($matches[0]) > 0
+	 						if ( !in_array($v['Field'], $matches[2]) ) {	//le reste des colonnes-index : index, unique etc
+	 							array_push($table_desc[$table_name]['columns'], $v['Field']);
+	 						}
 					}	// if($create_table_result['Table'] == $table_name)
 				}	// $v['Key'] == 'MUL'
 				else {
