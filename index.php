@@ -170,7 +170,16 @@ function generateJSMessage($message) {
 	document.getElementById("message").innerHTML = \'' . str_replace("'", "\'", $message) . ' <br />\';
 	</script>';
 }
-
+function in_array_multi($needle, $haystack, $strict = FALSE) {
+	foreach ($haystack as $key => $value) {
+		if (in_array($needle, $value, $strict)) {			
+			return $key;
+		}
+		else {
+			return false;
+		}
+	}
+}
 function mkDirectory($dirname) {
 	try {
 		mkdir($dirname);
@@ -353,7 +362,7 @@ if (isset($_POST['submit'])) {
 			//		array_push($table_desc[$table_name]['primary'], lcfirst(normalize_name($primary_key)));
 
 					array_push($table_desc[$table_name]['primary'], array('name' => lcfirst(normalize_name($primary_key)), 'type' => $phpType ));
-					array_push($table_desc[$table_name]['columns'], array('name' => lcfirst(normalize_name($primary_key)), 'type' => $phpType, 'role' => 'primary' ));
+					array_push($table_desc[$table_name]['columns'], array('name' => lcfirst(normalize_name($primary_key)), 'type' => $phpType, 'role' => 'primary', 'database_name' => $v['Field'] ));
 				}
 				else if ($v['Key'] == 'MUL') {
 
@@ -427,22 +436,26 @@ if (isset($_POST['submit'])) {
 
 			 					// table columns
 	 							if (! in_array($referenced_table_name, $table_desc[$table_name]['columns'])) {
-		 							array_push($table_desc[$table_name]['columns'], array('name' => $referenced_table_name, 'type' => "Model_" . normalize_name($referenced_table_name), 'role' => 'foreign' ));
+		 							array_push($table_desc[$table_name]['columns'], array('name' => $referenced_table_name, 'type' => "Model_" . normalize_name($referenced_table_name), 'role' => 'foreign', 'database_name' => $v['Field'] ));
 		 						}
 	 						}
 	 					}	//count($matches[0]) > 0
 	 						if ( !in_array($v['Field'], $matches[2]) ) {	//le reste des colonnes-index : index, unique etc
-	 							array_push($table_desc[$table_name]['columns'], array('name' => lcfirst(normalize_name($v['Field'])), 'type' => $phpType ));
+	 							array_push($table_desc[$table_name]['columns'], array('name' => lcfirst(normalize_name($v['Field'])), 'type' => $phpType, 'database_name' => $v['Field'] ));
 	 						}
 					}	// if($create_table_result['Table'] == $table_name)
 				}	// $v['Key'] == 'MUL'
 				else {
-					array_push($table_desc[$table_name]['columns'], array('name' => lcfirst(normalize_name($v['Field'])), 'type' => $phpType ));
+					array_push($table_desc[$table_name]['columns'], array('name' => lcfirst(normalize_name($v['Field'])), 'type' => $phpType, 'database_name' => $v['Field'] ));
 				}	
 			} 
 
 	 	}	// endof foreach ($table_names as $table_name)	 	 
 
+	 	echo '<pre>';
+	 	print_r($table_desc);
+	 	echo '</pre>';
+	 	exit();
 	 	// models, mappers, dbtables genaration
 	 	foreach ($table_names as $table_name) {
 
@@ -522,7 +535,7 @@ if (isset($_POST['submit'])) {
 					$dbtable_content .= "\t\t)," . PHP_EOL;
 					
 	 			}
-	 			
+
 	 			$dbtable_content .= "\t);". PHP_EOL;
 	 		}
 
@@ -538,7 +551,7 @@ if (isset($_POST['submit'])) {
 	 		}
 	 		$dbtable_content .= "}" . PHP_EOL;
 
-			echo $dbtable_content . '<br>';
+			echo $mapper_content . '<br>';
 			
 		 	// create files	
 		 	$model_creation_success = false;
@@ -559,13 +572,10 @@ if (isset($_POST['submit'])) {
 	 	if ($model_creation_success) { appendJSMessage('Models has been successfully created at ' . MODEL_PATH); }
 	 	if ($mapper_creation_success) { appendJSMessage('Mappers has been successfully created at ' . MAPPER_PATH); }
 	 	if ($dbtable_creation_success) { appendJSMessage('DbTables has been successfully created at ' . DBTABLE_PATH); }
+
 		echo '<pre>';
-	
-		print_r($table_desc);
+		// print_r($table_desc);
 		echo '</pre>';
-
-
-	// 	echo $model_content;
 	}
 	catch (Exception $e)
 	{
