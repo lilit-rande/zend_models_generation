@@ -162,12 +162,12 @@
 
 function appendJSMessage($message) {
 	echo '<script language="JavaScript" type="text/javascript">
-	document.getElementById("message").innerHTML += \'' . str_replace("'", "\'", $message) . '\';
+	document.getElementById("message").innerHTML += \'' . str_replace("'", "\'", $message) . ' <br />\';
 	</script>';
 }
 function generateJSMessage($message) {
 	echo '<script language="JavaScript" type="text/javascript">
-	document.getElementById("message").innerHTML = \'' . str_replace("'", "\'", $message) . '\';
+	document.getElementById("message").innerHTML = \'' . str_replace("'", "\'", $message) . ' <br />\';
 	</script>';
 }
 
@@ -273,10 +273,13 @@ if (isset($_POST['submit'])) {
 
 	extract($_POST, EXTR_SKIP);
 
+	$dbpath = $dbname;
+
 	define('DS', DIRECTORY_SEPARATOR);
 	define('PS', PATH_SEPARATOR);
 	define('ROOT_PATH', dirname(dirname(__FILE__)));
-	define('DB_PATH', dirname(__FILE__) . DS . 'models');
+	define('MODEL_GEN', dirname(__FILE__) . DS . 'models');
+	define('DB_PATH', MODEL_GEN . DS . $dbpath);
 	define('MODEL_PATH', DB_PATH . DS . 'models');
 	define('DBTABLE_PATH', MODEL_PATH . DS . 'DbTable');
 	define('MAPPER_PATH', MODEL_PATH . DS . 'mappers');
@@ -287,6 +290,7 @@ if (isset($_POST['submit'])) {
 	get_include_path()
 	);
 
+	if (!file_exists(MODEL_GEN )) { mkDirectory(MODEL_GEN); }
 	if (!file_exists(DB_PATH )) { mkDirectory(DB_PATH); }
 	if (!file_exists(MODEL_PATH )) { mkDirectory(MODEL_PATH); }
 	if (!file_exists(DBTABLE_PATH)) { mkDirectory(DBTABLE_PATH); }
@@ -385,16 +389,16 @@ if (isset($_POST['submit'])) {
 	 							$reference_line['foreign_key'] = $foreign_key;
 	 							$reference_line['referenced_table_name'] = $referenced_table_name;
 	 							$reference_line['referenced_column'] = $referenced_column;
-	 							$reference_ligne['referenced_model_dbtable_name'] = "Model_DbTable_" . normalize_name($referenced_table_name);
+	 							$reference_line['referenced_model_dbtable_name'] = "Model_DbTable_" . normalize_name($referenced_table_name);
 
 	 							if (isset($matches[5]) && isset($matches[6])) {
-	 								$reference_line[$matches[5]] = $matches[5][$i];	// ON DELETE / ON UPDATE
-	 								$reference_line[$matches[6]] = $matches[6][$i];
+	 								$reference_line['action_type_one'] = $matches[5][$i];	// ON DELETE / ON UPDATE
+	 								$reference_line['action_one'] = $matches[6][$i];
 	 							}
 
 	 							if (isset($matches[7]) && isset($matches[8])) {
-	 								$reference_line[$matches[7]] = $matches[7][$i];	// ON DELETE / ON UPDATE
-	 								$reference_line[$matches[8]] = $matches[8][$i];
+	 								$reference_line['action_type_two'] = $matches[7][$i];	// ON DELETE / ON UPDATE
+	 								$reference_line['action_two'] = $matches[8][$i];
 	 							}
 	 							array_push($references[$table_name], $reference_line);
 	 							array_push($table_desc[$table_name]['references'], $reference_line);
@@ -439,25 +443,13 @@ if (isset($_POST['submit'])) {
 
 	 	}	// endof foreach ($table_names as $table_name)	 	 
 
-	 	function modelGeneration($array) {
-	 		$content = "";
-	 		foreach ($array as $value) {
-	 			// private variables
-	 			$content .= generate_doc_comment(array('var' => $value['type']));
-	 			$content .= "\t" . 'private $' . $value['name'] . ';' . PHP_EOL;
-
-	 			// getters
-	 			$content .= generate_doc_comment(array('return' => 'the $' . $value['name']));
-	 			$content .= 'public function get' . ucfirst($value['name']) . '()' . PHP_EOL;
-	 		}
-	 		return $content;
-	 	}
-
 	 	// models, mappers, dbtables genaration
 	 	foreach ($table_names as $table_name) {
 
 	 		// MODELS
-			$model_content = "<?php" . PHP_EOL . "class Model_";
+			$model_content = "<?php" . PHP_EOL;
+			$model_content .= generate_doc_comment(array('category' => 'YOUR CATEGORY HERE', 'package'=>'YOUR PACKAGE NAME HERE', 'subpackage'=>'YOUR SUBPACKAGE NAME HERE', 'desc'=>'YOUR DESCRIPTION HERE', 'author'=>'YOUR NAME HERE', 'copyright'=>'COPYRIGHT', 'version'=>'YOUR APPLICATION VERSION HERE', 'since'=>'YOUR APPLICATION CREATION DATE HERE'));
+			$model_content .= "class Model_";
 			
 	 //		if ($table_name == 'language') print_r($table_desc[$table_name]['dependences']);
 	 		$model_content .= normalize_name($table_name) . PHP_EOL . '{';
@@ -485,23 +477,88 @@ if (isset($_POST['submit'])) {
 	 		}
 	 		
 	 		$model_content .= "}";
-	 		// MODELS
-			echo $model_content . '<br>';
 
+	 		// MAPPERS
 			$mapper_content = "<?php" . PHP_EOL . "class Model_Mapper_";
+			
+			// DBTABLES
+		 	$dbtable_doc_comment_params = array('category' => 'YOUR CATEGORY HERE', 'package'=>'YOUR PACKAGE NAME HERE', 'subpackage'=>'YOUR SUBPACKAGE NAME HERE', 'desc'=>'YOUR DESCRIPTION HERE', 'author'=>'YOUR NAME HERE', 'copyright'=>'COPYRIGHT', 'version'=>'YOUR APPLICATION VERSION HERE', 'since'=>'YOUR APPLICATION CREATION DATE HERE');
+		 	$dbtable_doc_comment = generate_doc_comment($dbtable_doc_comment_params, "DataTable Gateway");
+		 	$dbtable_content = "<?php" . PHP_EOL . $dbtable_doc_comment . "class Model_DbTable_";
 
+		 	$dbtable_content .= normalize_name($table_name) . " extends Zend_Db_Table_Abstract"  . PHP_EOL . "{" . PHP_EOL ;
+
+		 	// the table name / primary key as protected variables
+	 		$dbtable_content .= "\tprotected $" . "_name = '" . $table_name . "';" . PHP_EOL;
+	 		foreach ($table_desc[$table_name]['columns'] as $column) {
+		 		// TODO for views
+		 		if (isset($column['role']) && $column['role'] == 'primary') {
+		 			$dbtable_content .= "\tprotected $" . "_primary = '" . $column['name'] . "';" . PHP_EOL;
+		 		}	
+	 		}
+
+	 		// table references
+	 		if (isset($table_desc[$table_name]['references']) && count( $table_desc[$table_name]['references'] > 0 )) {
+
+	 			$ref_table_size = 0;
+	 			$dbtable_content .= "\tprotected $" . "_referenceMap = array(". PHP_EOL;
+
+	 			foreach ($table_desc[$table_name]['references'] as $ref_key => $ref_value) {
+
+	 				$dbtable_content .= "\t\t'" . $ref_value['foreign_key_name'] . "' => array(" . PHP_EOL; 
+	 				$dbtable_content .= "\t\t\t'columns' => array('". $ref_value['foreign_key'] ."')," . PHP_EOL;
+	 				$dbtable_content .= "\t\t\t'refTableClass' => '" . $ref_value['referenced_model_dbtable_name'] . "'," . PHP_EOL;
+	 				$dbtable_content .= "\t\t\t'refColumns' => array('". $ref_value['referenced_column'] ."')," . PHP_EOL;
+	 				
+	 				//TODO
+	 				if ( isset($action_type_one) ) {
+	 					$dbtable_content .= "\t\t\t'" . $ref_value['action_type_one'] . "' => self::" . $ref_value['action_one'] . "," . PHP_EOL;
+	 				}
+
+	 				if ( isset($action_type_two) ) {
+	 					$dbtable_content .= "\t\t\t'" . $ref_value['action_type_two'] . "' => self::" . $ref_value['action_two'] . "," . PHP_EOL;
+	 				}
+	 				 				
+					$dbtable_content .= "\t\t)," . PHP_EOL;
+					
+	 			}
+	 			
+	 			$dbtable_content .= "\t);". PHP_EOL;
+	 		}
+
+	 		// table dependences
+	 		if ( isset($table_desc[$table_name]['dependences']) && count($table_desc[$table_name]['dependences']) > 0 ) {
+	 			$depTables = "";
+	 			foreach ($table_desc[$table_name]['dependences'] as $dep_key => $dep_value) {
+	 				// concatenate dependent tables names for generate ligne as 
+	 				// protected $_dependentTables = array('depTableName1', 'depTableName2', ...);
+	 				$depTables .= strlen($depTables) > 0 ? ", '" . $dep_value['model_dbtable_name'] . "'" : "'" . $dep_value['model_dbtable_name'] . "'" ;	
+	 			}
+	 			$dbtable_content .= "\tprotected $" . "_dependentTables = array(" . $depTables . ");" . PHP_EOL;
+	 		}
+	 		$dbtable_content .= "}" . PHP_EOL;
+
+			echo $dbtable_content . '<br>';
+			
 		 	// create files	
-		 		try {	 
-					$handle = file_put_contents (MODEL_PATH . DS . ucfirst($table_name) . '.php', $model_content);
-					// $handle = file_put_contents (MAPPER_PATH . DS . ucfirst($table_name) . '.php', $mapper_content);
-				}
-		 		catch (Exception $e) {
-						generateJSMessage('Erreur de création ou d\'écriture dans le fichier ' . $e->getMessage());
-						die ();
-		 		}
+		 	$model_creation_success = false;
+		 	$mapper_creation_success = false;
+		 	$dbtable_creation_success = false;
+
+	 		try {	 
+				if ($handle = file_put_contents (MODEL_PATH . DS . ucfirst($table_name) . '.php', $model_content) ) { $model_creation_success = true; }
+				// if ($handle = file_put_contents (MAPPER_PATH . DS . ucfirst($table_name) . '.php', $mapper_content) ) { $mapper_creation_success = true; }
+				if ($handle = file_put_contents (DBTABLE_PATH . DS . ucfirst($table_name) . '.php', $dbtable_content) ) { $dbtable_creation_success = true; }
+			}
+	 		catch (Exception $e) {
+				generateJSMessage('Erreur de création ou d\'écriture dans le fichier ' . $e->getMessage());
+				die ();
+	 		}
 	 	}
 
-
+	 	if ($model_creation_success) { appendJSMessage('Models has been successfully created at ' . MODEL_PATH); }
+	 	if ($mapper_creation_success) { appendJSMessage('Mappers has been successfully created at ' . MAPPER_PATH); }
+	 	if ($dbtable_creation_success) { appendJSMessage('DbTables has been successfully created at ' . DBTABLE_PATH); }
 		echo '<pre>';
 	
 		print_r($table_desc);
