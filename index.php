@@ -325,6 +325,9 @@ if (isset($_POST['submit'])) {
 		$dependences = array();
 		$table_desc = array();
 
+		$has_references = false;
+		$has_dependences = false;
+
 		// generate table names array
 		foreach ($tables as $table) {
 			$name = $table[0];
@@ -401,35 +404,29 @@ if (isset($_POST['submit'])) {
 	 							$reference_line['referenced_model_dbtable_name'] = "Model_DbTable_" . normalize_name($referenced_table_name);
 
 	 							if (isset($matches[5]) && isset($matches[6])) {
-	 								// $reference_line['action_type_one'] = $matches[5][$i];	// ON DELETE / ON UPDATE
-	 								// $reference_line['action_one'] = $matches[6][$i];
-
-	 								$action_type_one = $matches[5][$i];	// ON DELETE / ON UPDATE
-	 								$action_one = $matches[6][$i];
+	 								$reference_line['action_type_one'] = $matches[5][$i];	// ON DELETE / ON UPDATE
+	 								$reference_line['action_one'] = $matches[6][$i];
 	 							}
 
 	 							if (isset($matches[7]) && isset($matches[8])) {
-	 								// $reference_line['action_type_two'] = $matches[7][$i];	// ON DELETE / ON UPDATE
-	 								// $reference_line['action_two'] = $matches[8][$i];
-
-	 								$action_type_two = $matches[7][$i];	// ON DELETE / ON UPDATE
-	 								$action_two = $matches[8][$i];
+	 								$reference_line['action_type_two'] = $matches[7][$i];	// ON DELETE / ON UPDATE
+	 								$reference_line['action_two'] = $matches[8][$i];
 	 							}
-	 							// array_push($references[$table_name], $reference_line);
+	 							array_push($references[$table_name], $reference_line);
 	 							array_push($table_desc[$table_name]['references'], $reference_line);
 
 	 							// table dependences
 		 						$dependence_ligne = array('table_name' => $table_name, 'model_dbtable_name' => "Model_DbTable_" . normalize_name($table_name));
 			 					
-			 					// //TODO a supprimer en gardant juste la partie table_desc[ref_tab_name][dependences]
-			 					// if ( isset($dependences[$referenced_table_name]) ) {
-			 					// 	if ( !in_array($dependence_ligne, $dependences[$referenced_table_name])) {
-			 					// 		array_push($dependences[$referenced_table_name], $dependence_ligne);
-			 					// 	}
-			 					// } else {
-			 					// 	$dependences[$referenced_table_name] = array();
-			 					// }	
+			 					if ( isset($dependences[$referenced_table_name]) ) {
+			 						if ( !in_array($dependence_ligne, $dependences[$referenced_table_name])) {
+			 							array_push($dependences[$referenced_table_name], $dependence_ligne);
+			 						}
+			 					} else {
+			 						$dependences[$referenced_table_name] = array();
+			 					}	
 
+			 					// //TODO a supprimer en gardant juste la partie table_desc[ref_tab_name][dependences]
 			 					if ( isset($table_desc[$referenced_table_name]['dependences']) ) {
 			 						if ( !in_array($dependence_ligne, $table_desc[$referenced_table_name]['dependences'])) {
 			 							array_push($table_desc[$referenced_table_name]['dependences'], $dependence_ligne);
@@ -481,6 +478,11 @@ if (isset($_POST['submit'])) {
 
 	 	// models, mappers, dbtables genaration
 	 	foreach ($table_names as $table_name) {
+	 		$has_references = (isset ($references[$table_name]) && count($references[$table_name]) > 0) ? true : false;
+	 		$has_dependences = (isset ($dependences[$table_name]) && count($dependences[$table_name]) > 0) ? true : false;
+
+	 		$has_references = (isset ($table_desc[$table_name]['references']) && count($table_desc[$table_name]['references']) > 0) ? true : false;
+	 		$has_dependences = (isset ($table_desc[$table_name]['dependences']) && count($table_desc[$table_name]['dependences']) > 0) ? true : false;
 
 	 		// MODELS
 			$model_content = "<?php" . PHP_EOL;
@@ -498,13 +500,19 @@ if (isset($_POST['submit'])) {
 	 		$dbtable_content .= "\tprotected $" . "_name = '" . $table_name . "';" . PHP_EOL;
 
 	 		// MAPPERS
-			$mapper_content = "ls?php" . PHP_EOL . "class Model_Mapper_" . $table_name . PHP_EOL . "{" . PHP_EOL ;
-	 		$mapper_content .= "\tconst TABLE_NAME = '$table_name';" . PHP_EOL ;
+			$mapper_content = "<?php" . PHP_EOL . "class Model_Mapper_" . $table_name . PHP_EOL . "{" . PHP_EOL ;
+	 		$mapper_content .= "\tconst TABLE_NAME = '$table_name';" . PHP_EOL;
 	 		
 	 		//mapper objectToRow function
 	 		$objectToRow_content = "";
 	 		$objectToRow_content .= generate_doc_comment(array('param' =>"Model_" . normalize_name($table_name) . " $" . $table_name, 'return' => 'array' ));
-	 		$objectToRow_content .= "\tpublic function objectToRow( Model_" . normalize_name($table_name) . " $" . $table_name .")" . PHP_EOL . "\t{"  . PHP_EOL;
+	 		$objectToRow_content .= "\tpublic function objectToRow( Model_" . normalize_name($table_name) . " $" . $table_name ." )" . PHP_EOL . "\t{" . PHP_EOL;
+
+	 		//mapper rowToObject function
+	 		$rowToObject_content = "";
+	 		$rowToObject_content .= generate_doc_comment(array('param' => 'array', 'return' =>"Model_" . normalize_name($table_name)));
+	 		$rowToObject_content .= "\t" . 'public function rowToObject($row)' . PHP_EOL . "\t{" . PHP_EOL;
+
 
 	 		// $model_content .= modelGeneration($table_desc[$table_name]['columns']);
 	 		foreach ($table_desc[$table_name]['columns'] as $column) {
@@ -536,34 +544,50 @@ if (isset($_POST['submit'])) {
 		 		}
 
 		 		// mapper constants
-		 		$mapper_content .= "\tCOL_" . strtoupper($column_db_name) . " = '$column_db_name';" . PHP_EOL;
+		 		$mapper_content .= "\tconst COL_" . strtoupper($column_db_name) . " = '$column_db_name';" . PHP_EOL;
 
 		 		//mapper objectToRow function
-		 		if (isset($column['role']) && $column['role'] == 'foreign') {
-		 			echo $table_desc[$table_name]['references'];
-		 		} else {
-		 			$objectToRow_content .= "\t\t$" . "row[self::COL_" . strtoupper($column_db_name) . "] = $" . $table_name . "->get" . $column_name;
+		 		$objectToRow_content .= "\t\t$" . "row[self::COL_" . strtoupper($column_db_name) . "] = $" . $table_name . "->get" . normalize_name($column_name) . "()";
+		 	
+		 		if ($has_references && $column_role == 'foreign' ) {
+		 			foreach ($table_desc[$table_name]['references'] as $reference_key=>$reference_value) {
+		 				if ( $column_db_name == $reference_value['foreign_key'] ){
+			 				$objectToRow_content .= '->get' . normalize_name( $reference_value['referenced_column'] ) . '()';
+
+			 				$rowToObject_content .= "\t\t$" . $reference_value['referenced_table_name'] . "Row = $" . "row->findParentRow('" . $reference_value['referenced_model_dbtable_name'] . "', '" . $reference_value['foreign_key_name'] . "');" . PHP_EOL;
+			 				$rowToObject_content .= "\t\t$" . $reference_value['referenced_table_name'] . "Mapper = new Model_Mapper_ " . normalize_name($reference_value['referenced_table_name']) . "();" . PHP_EOL;
+			 				$rowToObject_content .= "\t\t$" . $reference_value['referenced_table_name'] . " = $" . $reference_value['referenced_table_name'] . "Mapper->rowToObject($" . $reference_value['referenced_table_name'] . "Row);" . PHP_EOL . PHP_EOL;
+			 			}
+		 			}
 		 		}
 
-	 		}
-			/*
-    	$row[self::COL_ID] = $user->getId();
-    	$row[self::COL_FIRSTNAME] = $user->getFirstName();
-    	$row[self::COL_LASTNAME] = $user->getLastName();
-    	$row[self::COL_LOGIN] = $user->getLogin();
-    	$row[self::COL_PASSWORD] = $user->getPassword();
-    	$row[self::COL_EMAIL] = $user->getEmail();   
-  
-    	$row[self::COL_ROLE_ID] = $user->getRole()->getId();
-    	
-    	return $row;
-    }
-			 */
-	 		
-	 		$model_content .= "}";
 
+
+		 		$objectToRow_content .= ';' . PHP_EOL;
+
+	 		}
+
+    /*
+    
+
+
+    	$user = new $this->entityClassName;
+    	
+    	$user->setId($row[self::COL_ID])
+    		->setFirstName($row[self::COL_FIRSTNAME])
+    		->setLastName($row[self::COL_LASTNAME])
+    		->setLogin($row[self::COL_LOGIN])
+    		->setPassword($row[self::COL_PASSWORD])
+    		->setEmail($row[self::COL_EMAIL])
+    		->setRole($role);
+    	
+    	return $user;
+    }
+    */
+	 		$model_content .= "}";
+	 		$objectToRow_content .= PHP_EOL . "\t\treturn $" . $table_name . ";" . PHP_EOL . "\t}" . PHP_EOL;
 	 		// table references
-	 		if (isset($table_desc[$table_name]['references']) && count( $table_desc[$table_name]['references'] > 0 )) {
+	 		if ($has_references) {
 
 	 			$ref_table_size = 0;
 	 			$dbtable_content .= "\tprotected $" . "_referenceMap = array(". PHP_EOL;
@@ -592,7 +616,7 @@ if (isset($_POST['submit'])) {
 	 		}
 
 	 		// table dependences
-	 		if ( isset($table_desc[$table_name]['dependences']) && count($table_desc[$table_name]['dependences']) > 0 ) {
+	 		if ( $has_dependences ) {
 	 			$depTables = "";
 	 			foreach ($table_desc[$table_name]['dependences'] as $dep_key => $dep_value) {
 	 				// concatenate dependent tables names for generate ligne as 
@@ -604,9 +628,9 @@ if (isset($_POST['submit'])) {
 	 		$dbtable_content .= "}" . PHP_EOL;
 	 		
 	 		// mapper private variables
-	 		$mapper_content .= "\tprivate $" . "dbtable;" . PHP_EOL;
+	 		$mapper_content .= PHP_EOL . "\tprivate $" . "dbtable;" . PHP_EOL;
 	 		$mapper_content .= "\tprivate $" . "tableClassName = 'Model_DbTable_" . normalize_name($table_name) . "';" . PHP_EOL;
-	 		$mapper_content .= "\tprivate $" . "entityClassName = 'Model_" . normalize_name($table_name) . "';" . PHP_EOL;
+	 		$mapper_content .= "\tprivate $" . "entityClassName = 'Model_" . normalize_name($table_name) . "';" . PHP_EOL . PHP_EOL;
 
 	 		//mapper dbTable getter
 	 		$mapper_content .= generate_doc_comment(array('return' =>"Model_DbTable_" . normalize_name($table_name)));
@@ -625,23 +649,24 @@ if (isset($_POST['submit'])) {
 
 	 		//mapper objectToRow function
 	 		$mapper_content .= $objectToRow_content;
+	 		$mapper_content .= $rowToObject_content;
 
-	 		echo $mapper_content, '<br>';
+	 		// echo $mapper_content, '<br>';
 
 		 	// create files	
 		 	$model_creation_success = false;
 		 	$mapper_creation_success = false;
 		 	$dbtable_creation_success = false;
 
-	 	// 	try {	 
-			// 	if ($handle = file_put_contents (MODEL_PATH . DS . ucfirst($table_name) . '.php', $model_content) ) { $model_creation_success = true; }
-			// 	// if ($handle = file_put_contents (MAPPER_PATH . DS . ucfirst($table_name) . '.php', $mapper_content) ) { $mapper_creation_success = true; }
-			// 	if ($handle = file_put_contents (DBTABLE_PATH . DS . ucfirst($table_name) . '.php', $dbtable_content) ) { $dbtable_creation_success = true; }
-			// }
-	 	// 	catch (Exception $e) {
-			// 	generateJSMessage('Erreur de création ou d\'écriture dans le fichier ' . $e->getMessage());
-			// 	die ();
-	 	// 	}
+	 		try {	 
+				if ($handle = file_put_contents (MODEL_PATH . DS . ucfirst($table_name) . '.php', $model_content) ) { $model_creation_success = true; }
+				if ($handle = file_put_contents (MAPPER_PATH . DS . ucfirst($table_name) . '.php', $mapper_content) ) { $mapper_creation_success = true; }
+				if ($handle = file_put_contents (DBTABLE_PATH . DS . ucfirst($table_name) . '.php', $dbtable_content) ) { $dbtable_creation_success = true; }
+			}
+	 		catch (Exception $e) {
+				generateJSMessage('Erreur de création ou d\'écriture dans le fichier ' . $e->getMessage());
+				die ();
+	 		}
 	 	}
 
 
