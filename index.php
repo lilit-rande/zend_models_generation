@@ -515,9 +515,7 @@ if (isset($_POST['submit'])) {
 
 	 		$rowToObject .= generate_doc_comment(array('param' => 'array', 'return' =>"Model_" . normalize_name($table_name)));
 	 		$rowToObject .= "\t" . 'public function rowToObject($row)' . PHP_EOL . "\t{" . PHP_EOL;
-
 	 		$rowToObject_content .= "\t\t$" . $table_name . " = new $" . "this->entityClassName;" . PHP_EOL . PHP_EOL;
-	 		
 			$rowToObject_content .= "\t\t$" . $table_name . PHP_EOL;
 
 	 		// $model_content .= modelGeneration($table_desc[$table_name]['columns']);
@@ -547,6 +545,8 @@ if (isset($_POST['submit'])) {
 				// TODO for views
 		 		if (isset($column['role']) && $column['role'] == 'primary') {
 		 			$dbtable_content .= "\tprotected $" . "_primary = '" . $column_name . "';" . PHP_EOL;
+		 			$primary_key_name = 'COL_' . strtoupper($column_db_name);
+		 			$primary_key = $column_name;
 		 		}
 
 		 		// mapper constants
@@ -570,7 +570,9 @@ if (isset($_POST['submit'])) {
 		 		$objectToRow_content .= ';' . PHP_EOL;
 
 		 		$rowToObject_content .= "\t\t\t\t->set" . normalize_name($column_name) . '($row[self::COL_' . strtoupper($column_db_name) . '])' . PHP_EOL;
+
 	 		}
+
 	 		$model_content .= "}";
 	 		$objectToRow_content .= PHP_EOL . "\t\treturn $" . $table_name . ";" . PHP_EOL . "\t}" . PHP_EOL;
 	 		// table references
@@ -596,9 +598,7 @@ if (isset($_POST['submit'])) {
 	 				}
 	 				 				
 					$dbtable_content .= "\t\t)," . PHP_EOL;
-					
 	 			}
-
 	 			$dbtable_content .= "\t);". PHP_EOL;
 	 		}
 
@@ -638,10 +638,74 @@ if (isset($_POST['submit'])) {
 	 		$mapper_content .= $objectToRow_content;
 	 		
 	 		//mapper rowToObject function
-	 		$rowToObject_content .= ";\t\treturn $" . $table_name . PHP_EOL . "\t}" ;
+	 		$rowToObject_content .= ";\t\treturn $" . $table_name . PHP_EOL . "\t}". PHP_EOL ;
 	 		$rowToObject .= $rowToObject_fk_content . $rowToObject_content;
 	 		$mapper_content .= $rowToObject;
 
+	 		$find_function = generate_doc_comment(array('param' => 'unknown_type $id', 'return' => 'boolean|unknown'));
+	 		$find_function .= "\t" . 'public function find($id)' . PHP_EOL;
+	 		$find_function .= "\t{" . PHP_EOL;
+	 		$find_function .= "\t\t" . '$rowSet = $this->getDbTable()->find($id);' . PHP_EOL;
+	    	$find_function .= "\t\t" .'$row = $rowSet->current();' . PHP_EOL;
+	    	$find_function .= "\t\t" .'if ( 0 == count($row)) {' . PHP_EOL;
+	    	$find_function .= "\t\t\t\t" . 'return false;' . PHP_EOL;
+	    	$find_function .= "\t\t" .'}' . PHP_EOL;
+	    	$find_function .= "\t\t" .'return $this->rowToObject($row);' . PHP_EOL;
+	 		$find_function .= "\t}" . PHP_EOL;
+
+	 		$fetchAll_function = generate_doc_comment(array('return' => "multitype:Model_" . normalize_name($table_name)));
+			$fetchAll_function .= "\t" . 'public function fetchAll($where = null, $order = null, $count = null, $offset = null)' . PHP_EOL;
+			$fetchAll_function .= "\t" . '{' . PHP_EOL;
+			$fetchAll_function .= "\t\t" . '$row = array();' . PHP_EOL;
+			$fetchAll_function .= "\t\t" . '$rowSet = $this->getDbTable()->fetchAll($where = null, $order = null, $count = null, $offset = null);' . PHP_EOL;
+			$fetchAll_function .= "\t\t" . 'foreach ( $rowSet as $value) {' . PHP_EOL;
+			$fetchAll_function .= "\t\t\t\t" . '$row[] = $this->rowToObject($value);' . PHP_EOL;
+			$fetchAll_function .= "\t\t" . '}' . PHP_EOL;
+			$fetchAll_function .= "\t\t" . 'return $row;' . PHP_EOL;
+			$fetchAll_function .= "\t" . '}' . PHP_EOL;
+
+	 		$mapper_content .= $find_function;
+	 		$mapper_content .= $fetchAll_function;
+   			
+   			if ( isset($primary_key_name) ) {
+   				$save_funciton = generate_doc_comment(array('param' => "Model_" . normalize_name($table_name) . ' $' .$table_name));
+   				$save_funciton .= "\t" . 'public function save (Model_' . normalize_name($table_name) . ' $' .$table_name . ')' . PHP_EOL;
+				$save_funciton .= "\t" . '{' . PHP_EOL;
+				$save_funciton .= "\t\t" . '$row = $this->objectToRow(' . $table_name . ');' . PHP_EOL;
+				$save_funciton .= "\t\t" . 'try{' . PHP_EOL;
+				$save_funciton .= "\t\t\t" . 'if ( 0 === (int) $row[self::' . $primary_key_name . ']) {' . PHP_EOL;
+				$save_funciton .= "\t\t\t\t" . 'unset($row[self::' . $primary_key_name . ']);' . PHP_EOL;	
+				$save_funciton .= "\t\t\t\t" . 'return $this->getDbTable()->insert($row);' . PHP_EOL;
+				$save_funciton .= "\t\t\t" . '} else {' . PHP_EOL;
+				$save_funciton .= "\t\t\t\t" . '$where = array(self::' . $primary_key_name . ' . \' = ?\' => $row[self::' . $primary_key_name . ']);' . PHP_EOL;
+				$save_funciton .= "\t\t\t\t" . 'return $this->getDbTable()->update($row, $where);' . PHP_EOL;
+				$save_funciton .= "\t\t\t" . '}' . PHP_EOL;
+				$save_funciton .= "\t\t" . '} catch (Zend_Db_Statement_Exception $e) {' . PHP_EOL;
+				$save_funciton .= "\t\t\t" . '// YOUR ERROR VERIFICATION HERE' . PHP_EOL;
+				$save_funciton .= "\t\t\t" . '$message = "YOUR ERROR MESSAGE HERE";' . PHP_EOL;
+				$save_funciton .= "\t\t\t" . 'throw new DomainException($message);' . PHP_EOL;
+				$save_funciton .= "\t\t" . '}' . PHP_EOL;
+				$save_funciton .= "\t" . '}' . PHP_EOL;
+
+				$delete_function = generate_doc_comment(array('param' => normalize_name($table_name) . ' $' .$table_name, 'throws' => 'InvalidArgumentException'));
+				$delete_function .= "\t" . 'public function delete($'. $table_name .'){' . PHP_EOL;
+				$delete_function .= "\t\t" . 'if ( $'. $table_name .' instanceof $this->entityClassName ) {' . PHP_EOL;
+				$delete_function .= "\t\t\t" . '$id = $'. $table_name .'->get' . normalize_name($primary_key) . '();' . PHP_EOL;
+				$delete_function .= "\t\t" . '} else if ( is_int($'. $table_name .') ) {' . PHP_EOL;
+				$delete_function .= "\t\t\t" . '$id = $'. $table_name .';' . PHP_EOL;
+				$delete_function .= "\t\t" . '} else {' . PHP_EOL;
+				$delete_function .= "\t\t\t" . 'throw new InvalidArgumentException("$'. $table_name .' must be an instance of $this->entityClassName or an integer");' . PHP_EOL;
+				$delete_function .= "\t\t" . '}' . PHP_EOL;
+				
+				$delete_function .= "\t\t" . '$where = array(self::' . $primary_key_name . ' . \' = ?\' => $id);' . PHP_EOL;
+				$delete_function .= "\t\t" . 'return  (bool)$this->getDbTable()->delete($where);' . PHP_EOL;
+				$delete_function .= "\t" . '}' . PHP_EOL;
+		
+		 		$mapper_content .= $save_funciton;
+		 		$mapper_content .= $delete_function;
+			}
+
+	 		$mapper_content .= "}" . PHP_EOL;
 	 		// echo $mapper_content, '<br>';
 
 		 	// create files	
