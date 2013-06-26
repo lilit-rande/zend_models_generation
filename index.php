@@ -509,10 +509,16 @@ if (isset($_POST['submit'])) {
 	 		$objectToRow_content .= "\tpublic function objectToRow( Model_" . normalize_name($table_name) . " $" . $table_name ." )" . PHP_EOL . "\t{" . PHP_EOL;
 
 	 		//mapper rowToObject function
+	 		$rowToObject = "";
 	 		$rowToObject_content = "";
-	 		$rowToObject_content .= generate_doc_comment(array('param' => 'array', 'return' =>"Model_" . normalize_name($table_name)));
-	 		$rowToObject_content .= "\t" . 'public function rowToObject($row)' . PHP_EOL . "\t{" . PHP_EOL;
+	 		$rowToObject_fk_content = "";
 
+	 		$rowToObject .= generate_doc_comment(array('param' => 'array', 'return' =>"Model_" . normalize_name($table_name)));
+	 		$rowToObject .= "\t" . 'public function rowToObject($row)' . PHP_EOL . "\t{" . PHP_EOL;
+
+	 		$rowToObject_content .= "\t\t$" . $table_name . " = new $" . "this->entityClassName;" . PHP_EOL . PHP_EOL;
+	 		
+			$rowToObject_content .= "\t\t$" . $table_name . PHP_EOL;
 
 	 		// $model_content .= modelGeneration($table_desc[$table_name]['columns']);
 	 		foreach ($table_desc[$table_name]['columns'] as $column) {
@@ -540,7 +546,7 @@ if (isset($_POST['submit'])) {
 				// dbtable protected variables 
 				// TODO for views
 		 		if (isset($column['role']) && $column['role'] == 'primary') {
-		 			$dbtable_content .= "\tprotected $" . "_primary = '" . $column['name'] . "';" . PHP_EOL;
+		 			$dbtable_content .= "\tprotected $" . "_primary = '" . $column_name . "';" . PHP_EOL;
 		 		}
 
 		 		// mapper constants
@@ -554,36 +560,17 @@ if (isset($_POST['submit'])) {
 		 				if ( $column_db_name == $reference_value['foreign_key'] ){
 			 				$objectToRow_content .= '->get' . normalize_name( $reference_value['referenced_column'] ) . '()';
 
-			 				$rowToObject_content .= "\t\t$" . $reference_value['referenced_table_name'] . "Row = $" . "row->findParentRow('" . $reference_value['referenced_model_dbtable_name'] . "', '" . $reference_value['foreign_key_name'] . "');" . PHP_EOL;
-			 				$rowToObject_content .= "\t\t$" . $reference_value['referenced_table_name'] . "Mapper = new Model_Mapper_ " . normalize_name($reference_value['referenced_table_name']) . "();" . PHP_EOL;
-			 				$rowToObject_content .= "\t\t$" . $reference_value['referenced_table_name'] . " = $" . $reference_value['referenced_table_name'] . "Mapper->rowToObject($" . $reference_value['referenced_table_name'] . "Row);" . PHP_EOL . PHP_EOL;
+			 				$rowToObject_fk_content .= "\t\t$" . $reference_value['referenced_table_name'] . "Row = $" . "row->findParentRow('" . $reference_value['referenced_model_dbtable_name'] . "', '" . $reference_value['foreign_key_name'] . "');" . PHP_EOL;
+			 				$rowToObject_fk_content .= "\t\t$" . $reference_value['referenced_table_name'] . "Mapper = new Model_Mapper_ " . normalize_name($reference_value['referenced_table_name']) . "();" . PHP_EOL;
+			 				$rowToObject_fk_content .= "\t\t$" . $reference_value['referenced_table_name'] . " = $" . $reference_value['referenced_table_name'] . "Mapper->rowToObject($" . $reference_value['referenced_table_name'] . "Row);" . PHP_EOL . PHP_EOL;
 			 			}
 		 			}
 		 		}
 
-
-
 		 		$objectToRow_content .= ';' . PHP_EOL;
 
+		 		$rowToObject_content .= "\t\t\t\t->set" . normalize_name($column_name) . '($row[self::COL_' . strtoupper($column_db_name) . '])' . PHP_EOL;
 	 		}
-
-    /*
-    
-
-
-    	$user = new $this->entityClassName;
-    	
-    	$user->setId($row[self::COL_ID])
-    		->setFirstName($row[self::COL_FIRSTNAME])
-    		->setLastName($row[self::COL_LASTNAME])
-    		->setLogin($row[self::COL_LOGIN])
-    		->setPassword($row[self::COL_PASSWORD])
-    		->setEmail($row[self::COL_EMAIL])
-    		->setRole($role);
-    	
-    	return $user;
-    }
-    */
 	 		$model_content .= "}";
 	 		$objectToRow_content .= PHP_EOL . "\t\treturn $" . $table_name . ";" . PHP_EOL . "\t}" . PHP_EOL;
 	 		// table references
@@ -649,7 +636,11 @@ if (isset($_POST['submit'])) {
 
 	 		//mapper objectToRow function
 	 		$mapper_content .= $objectToRow_content;
-	 		$mapper_content .= $rowToObject_content;
+	 		
+	 		//mapper rowToObject function
+	 		$rowToObject_content .= ";\t\treturn $" . $table_name . PHP_EOL . "\t}" ;
+	 		$rowToObject .= $rowToObject_fk_content . $rowToObject_content;
+	 		$mapper_content .= $rowToObject;
 
 	 		// echo $mapper_content, '<br>';
 
@@ -677,9 +668,6 @@ if (isset($_POST['submit'])) {
 	 	if ($mapper_creation_success) { appendJSMessage('Mappers has been successfully created at ' . MAPPER_PATH); }
 	 	if ($dbtable_creation_success) { appendJSMessage('DbTables has been successfully created at ' . DBTABLE_PATH); }
 
-		echo '<pre>';
-		// print_r($table_desc);
-		echo '</pre>';
 	}
 	catch (Exception $e)
 	{
