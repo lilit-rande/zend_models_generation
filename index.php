@@ -394,11 +394,11 @@ if (isset($_POST['submit'])) {
 	 							$referenced_table_name = $matches[3][$i];
 	 							$referenced_column = $matches[4][$i];
 
-	 							// $reference_line['foreign_key_name'] = $foreign_key_name;
-	 							// $reference_line['foreign_key'] = $foreign_key;
-	 							// $reference_line['referenced_table_name'] = $referenced_table_name;
-	 							// $reference_line['referenced_column'] = $referenced_column;
-	 							// $reference_line['referenced_model_dbtable_name'] = "Model_DbTable_" . normalize_name($referenced_table_name);
+	 							$reference_line['foreign_key_name'] = $foreign_key_name;
+	 							$reference_line['foreign_key'] = $foreign_key;
+	 							$reference_line['referenced_table_name'] = $referenced_table_name;
+	 							$reference_line['referenced_column'] = $referenced_column;
+	 							$reference_line['referenced_model_dbtable_name'] = "Model_DbTable_" . normalize_name($referenced_table_name);
 
 	 							if (isset($matches[5]) && isset($matches[6])) {
 	 								// $reference_line['action_type_one'] = $matches[5][$i];	// ON DELETE / ON UPDATE
@@ -416,7 +416,7 @@ if (isset($_POST['submit'])) {
 	 								$action_two = $matches[8][$i];
 	 							}
 	 							// array_push($references[$table_name], $reference_line);
-	 							// array_push($table_desc[$table_name]['references'], $reference_line);
+	 							array_push($table_desc[$table_name]['references'], $reference_line);
 
 	 							// table dependences
 		 						$dependence_ligne = array('table_name' => $table_name, 'model_dbtable_name' => "Model_DbTable_" . normalize_name($table_name));
@@ -500,6 +500,11 @@ if (isset($_POST['submit'])) {
 	 		// MAPPERS
 			$mapper_content = "ls?php" . PHP_EOL . "class Model_Mapper_" . $table_name . PHP_EOL . "{" . PHP_EOL ;
 	 		$mapper_content .= "\tconst TABLE_NAME = '$table_name';" . PHP_EOL ;
+	 		
+	 		//mapper objectToRow function
+	 		$objectToRow_content = "";
+	 		$objectToRow_content .= generate_doc_comment(array('param' =>"Model_" . normalize_name($table_name) . " $" . $table_name, 'return' => 'array' ));
+	 		$objectToRow_content .= "\tpublic function objectToRow( Model_" . normalize_name($table_name) . " $" . $table_name .")" . PHP_EOL . "\t{"  . PHP_EOL;
 
 	 		// $model_content .= modelGeneration($table_desc[$table_name]['columns']);
 	 		foreach ($table_desc[$table_name]['columns'] as $column) {
@@ -533,7 +538,27 @@ if (isset($_POST['submit'])) {
 		 		// mapper constants
 		 		$mapper_content .= "\tCOL_" . strtoupper($column_db_name) . " = '$column_db_name';" . PHP_EOL;
 
+		 		//mapper objectToRow function
+		 		if (isset($column['role']) && $column['role'] == 'foreign') {
+		 			echo $table_desc[$table_name]['references'];
+		 		} else {
+		 			$objectToRow_content .= "\t\t$" . "row[self::COL_" . strtoupper($column_db_name) . "] = $" . $table_name . "->get" . $column_name;
+		 		}
+
 	 		}
+			/*
+    	$row[self::COL_ID] = $user->getId();
+    	$row[self::COL_FIRSTNAME] = $user->getFirstName();
+    	$row[self::COL_LASTNAME] = $user->getLastName();
+    	$row[self::COL_LOGIN] = $user->getLogin();
+    	$row[self::COL_PASSWORD] = $user->getPassword();
+    	$row[self::COL_EMAIL] = $user->getEmail();   
+  
+    	$row[self::COL_ROLE_ID] = $user->getRole()->getId();
+    	
+    	return $row;
+    }
+			 */
 	 		
 	 		$model_content .= "}";
 
@@ -583,7 +608,7 @@ if (isset($_POST['submit'])) {
 	 		$mapper_content .= "\tprivate $" . "tableClassName = 'Model_DbTable_" . normalize_name($table_name) . "';" . PHP_EOL;
 	 		$mapper_content .= "\tprivate $" . "entityClassName = 'Model_" . normalize_name($table_name) . "';" . PHP_EOL;
 
-	 		//mapper dbTable getter / setter
+	 		//mapper dbTable getter
 	 		$mapper_content .= generate_doc_comment(array('return' =>"Model_DbTable_" . normalize_name($table_name)));
 	 		$mapper_content .= "\tpublic function getDbTable()" . PHP_EOL . "\t{" . PHP_EOL;
 	 		$mapper_content .= "\t\tif (null === $" . "this->dbTable ) {" . PHP_EOL;
@@ -592,18 +617,17 @@ if (isset($_POST['submit'])) {
 	 		$mapper_content .= "\t\treturn $" . "this->dbTable;" . PHP_EOL;
 	 		$mapper_content .= "\t}" . PHP_EOL;
 
+	 		//mapper dbTable setter
+	 		$mapper_content .= generate_doc_comment(array('param' =>"dbTable"));
+	 		$mapper_content .= "\tpublic function setDbTable($" . "dbTable" . ")" . PHP_EOL . "\t{" . PHP_EOL;
+	 		$mapper_content .= "\t\t$" . "this->dbTable = $" . "dbTable;" . PHP_EOL;
+	 		$mapper_content .= "\t}" . PHP_EOL;
+
+	 		//mapper objectToRow function
+	 		$mapper_content .= $objectToRow_content;
+
 	 		echo $mapper_content, '<br>';
-			/*
-    		
 
-
-
-   public function setDbTable($dbTable)
-   {
-   		$this->dbTable = $dbTable;
-   }
-
-			 */
 		 	// create files	
 		 	$model_creation_success = false;
 		 	$mapper_creation_success = false;
