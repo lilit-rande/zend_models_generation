@@ -2,5 +2,6 @@
 *.sublime-workspace
 resources/*
 models/*
+archive/*
 db/*
 .DS_Store
