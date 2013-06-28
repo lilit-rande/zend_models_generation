@@ -396,78 +396,91 @@ if (isset($_POST['submit'])) {
 	 							$foreign_key = $matches[2][$i];
 	 							$referenced_table_name = $matches[3][$i];
 	 							$referenced_column = $matches[4][$i];
-								
+									 							
+	
+	 							$reference_line['foreign_key_name'] = $foreign_key_name;
+	 							$reference_line['foreign_key'] = $foreign_key;
+	 							$reference_line['referenced_table_name'] = $referenced_table_name;
+	 							$reference_line['referenced_column'] = $referenced_column;
+	 							$reference_line['referenced_model_dbtable_name'] = "Model_DbTable_" . normalize_name($referenced_table_name);
+	
+	 							if (isset($matches[5]) && isset($matches[6])) {
+	 								$reference_line['action_type_one'] = $matches[5][$i];	// ON DELETE / ON UPDATE
+	 								$reference_line['action_one'] = $matches[6][$i];
+	 							}
+
+	 							if (isset($matches[7]) && isset($matches[8])) {
+	 								$reference_line['action_type_two'] = $matches[7][$i];	// ON DELETE / ON UPDATE
+	 								$reference_line['action_two'] = $matches[8][$i];
+	 							}
+
+	 							array_push($references[$table_name], $reference_line);
 	 							
-	 							if ( in_array($v['Field'], $matches[2]) ) {
-	 								if ($v['Field'] == $foreign_key){
-	 								echo 'create table = ' , $subject , '<br>';
-	 								echo '<pre>';
-	 								print_r($matches);
-	 								echo '</pre>';
-		 							echo 'column name = ',	$v['Field'] , '<br>';
-		 							echo 'for key name = ',	$foreign_key_name , '<br>';
-		 							echo '$foreign_key = ',	$foreign_key , '<br>';
-		 							echo '$referenced_table_name = ',	$referenced_table_name , '<br>';
-		 							echo '$referenced_column = ',	$referenced_column , '<br>';
-		 							echo '$referenced_model_dbtable_name = ',	normalize_name($referenced_table_name) , '<br>';	 							
-		 							echo '<hr>';
+	 							array_push($table_desc[$table_name]['references'], $reference_line);
+	 							
+
+	 							// table dependences
+		 						$dependence_ligne = array('table_name' => $table_name, 'model_dbtable_name' => "Model_DbTable_" . normalize_name($table_name));
+			 					
+			 					if ( isset($dependences[$referenced_table_name]) ) {
+			 						if ( !in_array($dependence_ligne, $dependences[$referenced_table_name])) {
+			 							array_push($dependences[$referenced_table_name], $dependence_ligne);
+			 						}
+			 					} else {
+			 						$dependences[$referenced_table_name] = array();
+			 					}	
 	
-		 							$reference_line['foreign_key_name'] = $foreign_key_name;
-		 							$reference_line['foreign_key'] = $foreign_key;
-		 							$reference_line['referenced_table_name'] = $referenced_table_name;
-		 							$reference_line['referenced_column'] = $referenced_column;
-		 							$reference_line['referenced_model_dbtable_name'] = "Model_DbTable_" . normalize_name($referenced_table_name);
-	
-		 							if (isset($matches[5]) && isset($matches[6])) {
-		 								$reference_line['action_type_one'] = $matches[5][$i];	// ON DELETE / ON UPDATE
-		 								$reference_line['action_one'] = $matches[6][$i];
-		 							}
-	
-		 							if (isset($matches[7]) && isset($matches[8])) {
-		 								$reference_line['action_type_two'] = $matches[7][$i];	// ON DELETE / ON UPDATE
-		 								$reference_line['action_two'] = $matches[8][$i];
-		 							}
-		 							array_push($references[$table_name], $reference_line);
-		 							array_push($table_desc[$table_name]['references'], $reference_line);
-	
-		 							// table dependences
-			 						$dependence_ligne = array('table_name' => $table_name, 'model_dbtable_name' => "Model_DbTable_" . normalize_name($table_name));
-				 					
-				 					if ( isset($dependences[$referenced_table_name]) ) {
-				 						if ( !in_array($dependence_ligne, $dependences[$referenced_table_name])) {
-				 							array_push($dependences[$referenced_table_name], $dependence_ligne);
-				 						}
-				 					} else {
-				 						$dependences[$referenced_table_name] = array();
-				 					}	
-	
-				 					// //TODO a supprimer en gardant juste la partie table_desc[ref_tab_name][dependences]
-				 					if ( isset($table_desc[$referenced_table_name]['dependences']) ) {
-				 						if ( !in_array($dependence_ligne, $table_desc[$referenced_table_name]['dependences'])) {
-				 							array_push($table_desc[$referenced_table_name]['dependences'], $dependence_ligne);
-				 						}
-				 					} else {
-				 						$table_desc[$referenced_table_name]['dependences'] = array();
-				 					}
-	
-				 					$in_columns = false;
-				 					foreach ($table_desc[$table_name]['columns'] as $col_key => $col_value) {			 					
-				 						if ( in_array($v['Field'], $col_value)) {
-				 							$in_columns = true;
-				 						}
-				 					}			 					
-			 						if (! $in_columns) {
-			 							$temp_column = array('name' => $referenced_table_name, 'type' => "Model_" . normalize_name($referenced_table_name), 'role' => 'foreign', 'database_name' => $v['Field'] );
-			 							array_push($table_desc[$table_name]['columns'], $temp_column);
-				 					}
-									
-	
-				 					// table columns
-		 							// if (! in_array($referenced_table_name, $table_desc[$table_name]['columns'])) {
-			 						// 	array_push($table_desc[$table_name]['columns'], array('name' => $referenced_table_name, 'type' => "Model_" . normalize_name($referenced_table_name), 'role' => 'foreign', 'database_name' => $v['Field'] ));
-			 						// }
-		 						}
-	 						}
+			 					// //TODO a supprimer en gardant juste la partie table_desc[ref_tab_name][dependences]
+			 					if ( isset($table_desc[$referenced_table_name]['dependences']) ) {
+			 						if ( !in_array($dependence_ligne, $table_desc[$referenced_table_name]['dependences'])) {
+			 							array_push($table_desc[$referenced_table_name]['dependences'], $dependence_ligne);
+			 						}
+			 					} else {
+			 						$table_desc[$referenced_table_name]['dependences'] = array();
+			 					}
+
+			 					if ( in_array($v['Field'], $matches[2]) ) {
+			 						if ($v['Field'] == $foreign_key){
+			 							echo 'create table = ' , $subject , '<br>';
+			 							echo '<pre>';
+			 							print_r($matches);
+			 							echo '</pre>';
+			 							echo 'column name = ',	$v['Field'] , '<br>';
+			 							echo 'for key name = ',	$foreign_key_name , '<br>';
+			 							echo '$foreign_key = ',	$foreign_key , '<br>';
+			 							echo '$referenced_table_name = ',	$referenced_table_name , '<br>';
+			 							echo '$referenced_column = ',	$referenced_column , '<br>';
+			 							echo '$referenced_model_dbtable_name = ',	normalize_name($referenced_table_name) , '<br>';
+			 							echo '<hr>';
+			 							$references_same_table = false;
+			 							
+			 							$type = "Model_" . normalize_name($referenced_table_name);
+					 					$in_columns = false;
+					 					foreach ($table_desc[$table_name]['columns'] as $col_key => $col_value) {			 					
+					 						if ( in_array($v['Field'], $col_value)) {
+					 							$in_columns = true;
+					 						}
+					 						
+					 						if ($col_value['name'] == $referenced_table_name) {	// pour les tables dont la clé étrangere est une reference vers la table elle meme (ex: memeber has relation)
+					 							$referenced_table_name = $v['Field'];
+					 							$refereces_same_table = true;
+					 						}
+					 					}			 					
+				 						if (! $in_columns) {
+				 							$temp_column = array('name' => $referenced_table_name, 'type' => $type, 'role' => 'foreign', 'database_name' => $v['Field']);
+				 							if (isset($refereces_same_table) && $refereces_same_table) {
+				 								$temp_column['references_same_table'] = $refereces_same_table;
+				 							}
+				 							array_push($table_desc[$table_name]['columns'], $temp_column);
+					 					}
+										
+
+					 					// table columns
+			 							// if (! in_array($referenced_table_name, $table_desc[$table_name]['columns'])) {
+				 						// 	array_push($table_desc[$table_name]['columns'], array('name' => $referenced_table_name, 'type' => "Model_" . normalize_name($referenced_table_name), 'role' => 'foreign', 'database_name' => $v['Field'] ));
+				 						// }
+			 						}
+	 							}
 		 					}	//count($matches[0]) > 0
 	 					} else {	//le reste des colonnes-index
   							array_push($table_desc[$table_name]['columns'], array('name' => lcfirst(normalize_name($v['Field'])), 'type' => $phpType, 'database_name' => $v['Field'] ));
@@ -485,7 +498,7 @@ if (isset($_POST['submit'])) {
 	 	echo '<pre>';
 	 	print_r($table_desc);
 	 	echo '</pre>';
-exit();
+
 
 	 	// models, mappers, dbtables genaration
 	 	foreach ($table_names as $table_name) {
@@ -571,17 +584,22 @@ exit();
 		 				if ( $column_db_name == $reference_value['foreign_key'] ){
 			 				$objectToRow_content .= '->get' . normalize_name( $reference_value['referenced_column'] ) . '()';
 
-			 				$rowToObject_fk_content .= "\t\t$" . $reference_value['referenced_table_name'] . "Row = $" . "row->findParentRow('" . $reference_value['referenced_model_dbtable_name'] . "', '" . $reference_value['foreign_key_name'] . "');" . PHP_EOL;
-			 				$rowToObject_fk_content .= "\t\t$" . $reference_value['referenced_table_name'] . "Mapper = new Model_Mapper_" . normalize_name($reference_value['referenced_table_name']) . "();" . PHP_EOL;
-			 				$rowToObject_fk_content .= "\t\t$" . $reference_value['referenced_table_name'] . " = $" . $reference_value['referenced_table_name'] . "Mapper->rowToObject($" . $reference_value['referenced_table_name'] . "Row);" . PHP_EOL . PHP_EOL;
+			 				$rowToObjectModel =(isset($column['references_same_table']) && $column['references_same_table'])  ? lcfirst(normalize_name($column['name'])) : $reference_value['referenced_table_name'];
+			 						 						
+			 				$rowToObject_fk_content .= "\t\t$" . $rowToObjectModel . "Row = $" . "row->findParentRow('" . $reference_value['referenced_model_dbtable_name'] . "', '" . $reference_value['foreign_key_name'] . "');" . PHP_EOL;
+			 				$rowToObject_fk_content .= "\t\t$" . $rowToObjectModel . "Mapper = new Model_Mapper_" . normalize_name($reference_value['referenced_table_name']) . "();" . PHP_EOL;
+			 				$rowToObject_fk_content .= "\t\t$" . $rowToObjectModel . " = $" . $reference_value['referenced_table_name'] . "Mapper->rowToObject($" . $rowToObjectModel . "Row);" . PHP_EOL . PHP_EOL;
+			 				
+			 				$rowToObjectCol = '$' . $rowToObjectModel;
 			 			}
 		 			}
+		 		} else {
+		 			$rowToObjectCol = '$row[self::COL_' . strtoupper($column_db_name) . ']';
 		 		}
 
 		 		$objectToRow_content .= ';' . PHP_EOL;
 
-		 		$rowToObject_content .= "\t\t\t\t->set" . normalize_name($column_name) . '($row[self::COL_' . strtoupper($column_db_name) . '])' . PHP_EOL;
-
+		 		$rowToObject_content .= "\t\t\t\t->set" . normalize_name($column_name) . "($rowToObjectCol)" . PHP_EOL;
 	 		}
 
 	 		$model_content .= "}";
