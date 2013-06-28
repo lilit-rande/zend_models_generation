@@ -320,9 +320,6 @@ if (isset($_POST['submit'])) {
 		$table_desc = array();
 		
 		$matches = array();
-
-		$references = array();
-		$dependences = array();
 		$table_desc = array();
 
 		$has_references = false;
@@ -362,18 +359,11 @@ if (isset($_POST['submit'])) {
 
 				if ($v['Key'] == 'PRI' ) {
 					$primary_key = $v['Field'];
-			//		array_push($table_desc[$table_name]['primary'], lcfirst(normalize_name($primary_key)));
-
-					array_push($table_desc[$table_name]['primary'], array('name' => lcfirst(normalize_name($primary_key)), 'type' => $phpType ));
 					array_push($table_desc[$table_name]['columns'], array('name' => lcfirst(normalize_name($primary_key)), 'type' => $phpType, 'role' => 'primary', 'database_name' => $v['Field'] ));
 				}
 				else if ($v['Key'] == 'MUL') {
-
-					$references[$table_name] = array();
 					$table_desc[$table_name]['references'] = array();
-					// $foreign_key = $v['Field'];
-					// $foreign_keys_list .= strlen($foreign_keys_list) > 0 ? ", '$foreign_key'" : "'$foreign_key'" ;
-				
+
 					if($create_table_result['Table'] == $table_name) {					
 	 					$subject = $create_table_result['Create Table']; 
 	 			
@@ -412,25 +402,12 @@ if (isset($_POST['submit'])) {
 	 							if (isset($matches[7]) && isset($matches[8])) {
 	 								$reference_line['action_type_two'] = $matches[7][$i];	// ON DELETE / ON UPDATE
 	 								$reference_line['action_two'] = $matches[8][$i];
-	 							}
-
-	 							array_push($references[$table_name], $reference_line);
-	 							
+	 							}	 							
 	 							array_push($table_desc[$table_name]['references'], $reference_line);
 	 							
-
 	 							// table dependences
 		 						$dependence_ligne = array('table_name' => $table_name, 'model_dbtable_name' => "Model_DbTable_" . normalize_name($table_name));
-			 					
-			 					if ( isset($dependences[$referenced_table_name]) ) {
-			 						if ( !in_array($dependence_ligne, $dependences[$referenced_table_name])) {
-			 							array_push($dependences[$referenced_table_name], $dependence_ligne);
-			 						}
-			 					} else {
-			 						$dependences[$referenced_table_name] = array();
-			 					}	
-	
-			 					// //TODO a supprimer en gardant juste la partie table_desc[ref_tab_name][dependences]
+
 			 					if ( isset($table_desc[$referenced_table_name]['dependences']) ) {
 			 						if ( !in_array($dependence_ligne, $table_desc[$referenced_table_name]['dependences'])) {
 			 							array_push($table_desc[$referenced_table_name]['dependences'], $dependence_ligne);
@@ -441,17 +418,6 @@ if (isset($_POST['submit'])) {
 
 			 					if ( in_array($v['Field'], $matches[2]) ) {
 			 						if ($v['Field'] == $foreign_key){
-			 							echo 'create table = ' , $subject , '<br>';
-			 							echo '<pre>';
-			 							print_r($matches);
-			 							echo '</pre>';
-			 							echo 'column name = ',	$v['Field'] , '<br>';
-			 							echo 'for key name = ',	$foreign_key_name , '<br>';
-			 							echo '$foreign_key = ',	$foreign_key , '<br>';
-			 							echo '$referenced_table_name = ',	$referenced_table_name , '<br>';
-			 							echo '$referenced_column = ',	$referenced_column , '<br>';
-			 							echo '$referenced_model_dbtable_name = ',	normalize_name($referenced_table_name) , '<br>';
-			 							echo '<hr>';
 			 							$references_same_table = false;
 			 							
 			 							$type = "Model_" . normalize_name($referenced_table_name);
@@ -459,8 +425,7 @@ if (isset($_POST['submit'])) {
 					 					foreach ($table_desc[$table_name]['columns'] as $col_key => $col_value) {			 					
 					 						if ( in_array($v['Field'], $col_value)) {
 					 							$in_columns = true;
-					 						}
-					 						
+					 						}					 						
 					 						if ($col_value['name'] == $referenced_table_name) {	// pour les tables dont la clé étrangere est une reference vers la table elle meme (ex: memeber has relation)
 					 							$referenced_table_name = $v['Field'];
 					 							$refereces_same_table = true;
@@ -473,12 +438,6 @@ if (isset($_POST['submit'])) {
 				 							}
 				 							array_push($table_desc[$table_name]['columns'], $temp_column);
 					 					}
-										
-
-					 					// table columns
-			 							// if (! in_array($referenced_table_name, $table_desc[$table_name]['columns'])) {
-				 						// 	array_push($table_desc[$table_name]['columns'], array('name' => $referenced_table_name, 'type' => "Model_" . normalize_name($referenced_table_name), 'role' => 'foreign', 'database_name' => $v['Field'] ));
-				 						// }
 			 						}
 	 							}
 		 					}	//count($matches[0]) > 0
@@ -502,9 +461,6 @@ if (isset($_POST['submit'])) {
 
 	 	// models, mappers, dbtables genaration
 	 	foreach ($table_names as $table_name) {
-	 		$has_references = (isset ($references[$table_name]) && count($references[$table_name]) > 0) ? true : false;
-	 		$has_dependences = (isset ($dependences[$table_name]) && count($dependences[$table_name]) > 0) ? true : false;
-
 	 		$has_references = (isset ($table_desc[$table_name]['references']) && count($table_desc[$table_name]['references']) > 0) ? true : false;
 	 		$has_dependences = (isset ($table_desc[$table_name]['dependences']) && count($table_desc[$table_name]['dependences']) > 0) ? true : false;
 
@@ -540,8 +496,9 @@ if (isset($_POST['submit'])) {
 	 		$rowToObject .= generate_doc_comment(array('param' => 'array', 'return' =>"Model_" . normalize_name($table_name)));
 	 		$rowToObject .= "\t" . 'public function rowToObject($row)' . PHP_EOL . "\t{" . PHP_EOL;
 	 		$rowToObject_content .= "\t\t$" . $table_name . " = new $" . "this->entityClassName;" . PHP_EOL . PHP_EOL;
-			$rowToObject_content .= "\t\t$" . $table_name . PHP_EOL;
+			$rowToObject_content .= "\t\t$" . $table_name;
 
+			$step = 0;
 	 		// $model_content .= modelGeneration($table_desc[$table_name]['columns']);
 	 		foreach ($table_desc[$table_name]['columns'] as $column) {
 	 			$column_name = $column['name'];
@@ -578,9 +535,12 @@ if (isset($_POST['submit'])) {
 
 		 		//mapper objectToRow function
 		 		$objectToRow_content .= "\t\t$" . "row[self::COL_" . strtoupper($column_db_name) . "] = $" . $table_name . "->get" . normalize_name($column_name) . "()";
-		 	
+		 		
+		 		$tab = $step == 0 ? "" : "\t\t\t\t";
+		 		$step++;
 		 		if ($has_references && $column_role == 'foreign' ) {
 		 			foreach ($table_desc[$table_name]['references'] as $reference_key=>$reference_value) {
+		 				
 		 				if ( $column_db_name == $reference_value['foreign_key'] ){
 			 				$objectToRow_content .= '->get' . normalize_name( $reference_value['referenced_column'] ) . '()';
 
@@ -598,8 +558,10 @@ if (isset($_POST['submit'])) {
 		 		}
 
 		 		$objectToRow_content .= ';' . PHP_EOL;
-
-		 		$rowToObject_content .= "\t\t\t\t->set" . normalize_name($column_name) . "($rowToObjectCol)" . PHP_EOL;
+				
+		 		$eol = $step < count($table_desc[$table_name]['columns']) ? PHP_EOL : ";" . PHP_EOL;		 		
+		 			
+		 		$rowToObject_content .= $tab . "->set" . normalize_name($column_name) . "($rowToObjectCol)" . $eol;
 	 		}
 
 	 		$model_content .= "}";
@@ -667,7 +629,7 @@ if (isset($_POST['submit'])) {
 	 		$mapper_content .= $objectToRow_content;
 	 		
 	 		//mapper rowToObject function
-	 		$rowToObject_content .= ";\t\treturn $" . $table_name . ';' . PHP_EOL . "\t}". PHP_EOL ;
+	 		$rowToObject_content .= PHP_EOL . "\t\treturn $" . $table_name . ';' . PHP_EOL . "\t}". PHP_EOL ;
 	 		$rowToObject .= $rowToObject_fk_content . $rowToObject_content;
 	 		$mapper_content .= $rowToObject;
 
@@ -743,9 +705,9 @@ if (isset($_POST['submit'])) {
 		 	$dbtable_creation_success = false;
 
 	 		try {	 
-				if ($handle = file_put_contents (MODEL_PATH . DS . ucfirst($table_name) . '.php', $model_content) ) { $model_creation_success = true; }
-				if ($handle = file_put_contents (MAPPER_PATH . DS . ucfirst($table_name) . '.php', $mapper_content) ) { $mapper_creation_success = true; }
-				if ($handle = file_put_contents (DBTABLE_PATH . DS . ucfirst($table_name) . '.php', $dbtable_content) ) { $dbtable_creation_success = true; }
+				if ($handle = file_put_contents (MODEL_PATH . DS . normalize_name($table_name) . '.php', $model_content) ) { $model_creation_success = true; }
+				if ($handle = file_put_contents (MAPPER_PATH . DS . normalize_name($table_name) . '.php', $mapper_content) ) { $mapper_creation_success = true; }
+				if ($handle = file_put_contents (DBTABLE_PATH . DS . normalize_name($table_name) . '.php', $dbtable_content) ) { $dbtable_creation_success = true; }
 			}
 	 		catch (Exception $e) {
 				generateJSMessage('Erreur de création ou d\'écriture dans le fichier ' . $e->getMessage());
