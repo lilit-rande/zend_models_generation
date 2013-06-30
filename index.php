@@ -1,5 +1,5 @@
 <html>
-	<title>Model generation</title>
+	<title>Models / Mappers / DbTables </title>
 		<style> 
 			body {
 				color: #333333;
