@@ -237,13 +237,29 @@ function generate_doc_comment($desc_array, $message = "") {
 // KEY `fk_project_needs_skill_skill1_idx` (`skill_id_skill`),
 // KEY `date_insert` (`date_insert`),
 // KEY `date_update` (`date_update`),
-// CONSTRAINT `fk_project_needs_skill_project1` FOREIGN KEY (`project_id_project`) REFERENCES `project` (`id_project`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-// CONSTRAINT `fk_project_needs_skill_skill1` FOREIGN KEY (`skill_id_skill`) REFERENCES `skill` (`id_skill`) ON DELETE NO ACTION ON UPDATE NO ACTION
+// CONSTRAINT `fk_project_needs_skill_project1` FOREIGN KEY (`project_id_project`) REFERENCES `project` (`id_project`) ON DELETE CASCADE ON UPDATE NO ACTION,
+// CONSTRAINT `fk_project_needs_skill_skill1` FOREIGN KEY (`skill_id_skill`) REFERENCES `skill` (`id_skill`) ON UPDATE RESTRICT,
+// 						CONSTRAINT `fk_project_needs_skill_project1` FOREIGN KEY (`project_id_project`) REFERENCES `project` (`id_project`) ON DELETE CASCADE
 // ) ENGINE=InnoDB DEFAULT CHARSET=utf8
 // )";
 
-// $pat = "/CONSTRAINT\s?\`([^\`]*)\`\s?FOREIGN KEY\s?\(\`([^\`]*)\`\)\s?REFERENCES\s?\`([^\`]*)\` \(\`([^\`]*)\`\)/";
+// $str2 = "CREATE TABLE `user` ( 
+// 						`user_id` smallint(5) unsigned NOT NULL AUTO_INCREMENT, 
+// 						`role_id` tinyint(3) unsigned DEFAULT NULL, 
+// 						`user_firstname` varchar(100) NOT NULL, 
+// 						`user_lastname` varchar(100) NOT NULL, 
+// 						`user_login` varchar(50) NOT NULL, 
+// 						`user_password` varchar(40) NOT NULL, 
+// 						`user_email` varchar(120) NOT NULL, 
+// 						PRIMARY KEY (`user_id`), 
+// 						KEY `fk_user_role` (`role_id`), 
+// 						KEY `user_login` (`user_login`), 
+// 						KEY `user_email` (`user_email`), 
+// CONSTRAINT `FK_user_role` FOREIGN KEY (`role_id`) REFERENCES `role` (`role_id`) ON UPDATE CASCADE 
+// 						) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8";
 
+// $pat = "/CONSTRAINT\s?\`([^\`]*)\`\s?FOREIGN KEY\s?\(\`([^\`]*)\`\)\s?REFERENCES\s?\`([^\`]*)\` \(\`([^\`]*)\`\)\s?(ON DELETE)?\s?(RESTRICT|CASCADE)?\s?(ON UPDATE?)?\s?(RESTRICT|CASCADE)?/";
+// //(ON DELETE|ON UPDATE)\s?(RESTRICT|CASCADE)?
 // preg_match_all($pat, $str, $matches_pk);
 
 // echo '<pre>';
@@ -341,14 +357,19 @@ if (isset($_POST['submit'])) {
 
 					if($create_table_result['Table'] == $table_name) {					
 	 					$subject = $create_table_result['Create Table']; 
-	 			
+	 					
+	 					print_r($subject);
 	 					// foreign key names 
-	 					$pattern = "/CONSTRAINT\s?\`([^\`]*)\`\s?FOREIGN KEY\s?\(\`([^\`]*)\`\)\s?REFERENCES\s?\`([^\`]*)\` \(\`([^\`]*)\`\)/";
+	 					$pattern = "/CONSTRAINT\s?\`([^\`]*)\`\s?FOREIGN KEY\s?\(\`([^\`]*)\`\)\s?REFERENCES\s?\`([^\`]*)\` \(\`([^\`]*)\`\)\s?(ON DELETE)?\s?(RESTRICT|CASCADE)?\s?(ON UPDATE?)?\s?(RESTRICT|CASCADE)?/";
+// 	 					$pattern = "/CONSTRAINT\s?\`([^\`]*)\`\s?FOREIGN KEY\s?\(\`([^\`]*)\`\)\s?REFERENCES\s?\`([^\`]*)\` \(\`([^\`]*)\`\)/";
 	 					//CONSTRAINT `fk_member_has_skill_member1` FOREIGN KEY (`id_member`) REFERENCES `member` (`id_member`) ON DELETE NO ACTION ON UPDATE NO ACTION,
 	 					
 	 					// matches[1] = for_key_name, matches[2] = for_key_column_name, matches[3]=referenced table name, matches[4] = referenced column name
 	 					preg_match_all($pattern, $subject, $matches);
-	 			
+	 					
+	 					echo '<pre>';
+	 					print_r($matches);
+	 					echo '</pre>';
 	 					$count = count($matches[0]);
 	 					if ($count > 0) {
 
@@ -361,7 +382,6 @@ if (isset($_POST['submit'])) {
 	 							$foreign_key = $matches[2][$i];
 	 							$referenced_table_name = $matches[3][$i];
 	 							$referenced_column = $matches[4][$i];
-									 							
 	
 	 							$reference_line['foreign_key_name'] = $foreign_key_name;
 	 							$reference_line['foreign_key'] = $foreign_key;
@@ -369,13 +389,13 @@ if (isset($_POST['submit'])) {
 	 							$reference_line['referenced_column'] = $referenced_column;
 	 							$reference_line['referenced_model_dbtable_name'] = "Model_DbTable_" . normalize_name($referenced_table_name);
 	
-	 							if (isset($matches[5]) && isset($matches[6])) {
-	 								$reference_line['action_type_one'] = $matches[5][$i];	// ON DELETE / ON UPDATE
+	 							if (isset($matches[5]) && isset($matches[6]) && strlen($matches[5][$i]) && strlen($matches[6][$i]) ) {
+	 								$reference_line['action_type_one'] = $matches[5][$i];	// ON DELETE
 	 								$reference_line['action_one'] = $matches[6][$i];
 	 							}
 
-	 							if (isset($matches[7]) && isset($matches[8])) {
-	 								$reference_line['action_type_two'] = $matches[7][$i];	// ON DELETE / ON UPDATE
+	 							if (isset($matches[7]) && isset($matches[8]) && strlen($matches[7][$i]) && strlen($matches[8][$i]) ) {
+	 								$reference_line['action_type_two'] = $matches[7][$i];	// ON UPDATE
 	 								$reference_line['action_two'] = $matches[8][$i];
 	 							}	 							
 	 							array_push($table_desc[$table_name]['references'], $reference_line);
@@ -544,11 +564,11 @@ if (isset($_POST['submit'])) {
 					 				. "\t\t\t'refColumns' => array('". $ref_value['referenced_column'] ."')," . PHP_EOL;
 					 				
 	 				//TODO
-	 				if ( isset($action_type_one) ) {
+	 				if ( isset($ref_value['action_type_one']) && strlen($ref_value['action_type_one']) > 0 ) {
 	 					$dbtable_content .= "\t\t\t'" . $ref_value['action_type_one'] . "' => self::" . $ref_value['action_one'] . "," . PHP_EOL;
 	 				}
 
-	 				if ( isset($action_type_two) ) {
+	 				if ( isset($ref_value['action_type_two']) && strlen($ref_value['action_type_two']) > 0 ) {
 	 					$dbtable_content .= "\t\t\t'" . $ref_value['action_type_two'] . "' => self::" . $ref_value['action_two'] . "," . PHP_EOL;
 	 				}			
 					$dbtable_content .= "\t\t)," . PHP_EOL;
