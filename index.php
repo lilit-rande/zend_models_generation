@@ -311,9 +311,6 @@ if (isset($_POST['submit'])) {
 	 					//  matches[5] = ON DELETE , matches[6] = RESTRICT OR CASCADE  matches[6] = ON UPDATE , matches[6] = RESTRICT OR CASCADE
 	 					preg_match_all($pattern, $subject, $matches);
 	 					
-	 					echo '<pre>';
-	 					print_r($matches);
-	 					echo '</pre>';
 	 					$count = count($matches[0]);
 	 					if ($count > 0) {
 
