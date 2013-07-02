@@ -170,16 +170,6 @@ function generateJSMessage($message) {
 	document.getElementById("message").innerHTML = \'' . str_replace("'", "\'", $message) . ' <br />\';
 	</script>';
 }
-function in_array_multi($needle, $haystack, $strict = FALSE) {
-	foreach ($haystack as $key => $value) {
-		if (in_array($needle, $value, $strict)) {			
-			return $key;
-		}
-		else {
-			return false;
-		}
-	}
-}
 function mkDirectory($dirname) {
 	try {
 		mkdir($dirname);
@@ -405,8 +395,8 @@ if (isset($_POST['submit'])) {
 
 	 	// models, mappers, dbtables genaration
 	 	foreach ($table_names as $table_name) {
-	 		$has_references = (isset ($table_desc[$table_name]['references']) && count($table_desc[$table_name]['references']) > 0) ? true : false;
-	 		$has_dependences = (isset ($table_desc[$table_name]['dependences']) && count($table_desc[$table_name]['dependences']) > 0) ? true : false;
+	 		$has_references = (isset ($table_desc[$table_name]['references']) && !empty($table_desc[$table_name]['references']) > 0) ? true : false;
+	 		$has_dependences = (isset ($table_desc[$table_name]['dependences']) && !empty($table_desc[$table_name]['dependences']) > 0) ? true : false;
 
 	 		// MODELS
 			$model_content = "<?php" . PHP_EOL
