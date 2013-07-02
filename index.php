@@ -303,7 +303,6 @@ if (isset($_POST['submit'])) {
 					if($create_table_result['Table'] == $table_name) {					
 	 					$subject = $create_table_result['Create Table']; 
 	 					
-	 					print_r($subject);
 	 					// foreign key names 
 	 					$pattern = "/CONSTRAINT\s?\`([^\`]*)\`\s?FOREIGN KEY\s?\(\`([^\`]*)\`\)\s?REFERENCES\s?\`([^\`]*)\` \(\`([^\`]*)\`\)\s?(ON DELETE)?\s?(RESTRICT|CASCADE)?\s?(ON UPDATE?)?\s?(RESTRICT|CASCADE)?/";
 	 					
