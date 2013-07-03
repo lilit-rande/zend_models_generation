@@ -178,9 +178,7 @@ function mkDirectory($dirname) {
 	}
 }
 function normalize_name($column_name) {
-	$exclude = array('_' => ' ', '-'=>' ', '.'=>' ');
-	$tmp = ucwords(strtr($column_name, $exclude));
-
+	$tmp = ucwords(preg_replace('/[^a-zA-Z0-9]/', ' ', $column_name));
 	return str_replace(' ', '',$tmp);
 }
 // convert mysql types into php
