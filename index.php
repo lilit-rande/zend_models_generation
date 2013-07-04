@@ -172,7 +172,13 @@ function generateJSMessage($message) {
 }
 function mkDirectory($dirname) {
 	try {
-		mkdir($dirname);
+		if (is_array($dirname))  {
+			foreach ($dirname as $dir) {
+				if (!file_exists($dir )) { mkdir($dir); }  
+			}
+		} else {
+			if (!file_exists($dirname )) { mkdir($dirname); }  
+		}		
 	} catch (Exception $e) {
 		generateJSMessage($e->message);
 	}
@@ -241,12 +247,8 @@ if (isset($_POST['submit'])) {
 	get_include_path()
 	);
 
-	if (!file_exists(MODEL_GEN )) { mkDirectory(MODEL_GEN); }
-	if (!file_exists(DB_PATH )) { mkDirectory(DB_PATH); }
-	if (!file_exists(MODEL_PATH )) { mkDirectory(MODEL_PATH); }
-	if (!file_exists(DBTABLE_PATH)) { mkDirectory(DBTABLE_PATH); }
-	if (!file_exists(MAPPER_PATH)) { mkDirectory(MAPPER_PATH); }
-
+	$directoryList = array(MODEL_GEN, DB_PATH, MODEL_PATH, DBTABLE_PATH, MAPPER_PATH);
+	mkDirectory($directoryList);
 	try
 	{
 		// bdd connection params
