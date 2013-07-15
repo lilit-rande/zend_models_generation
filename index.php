@@ -576,7 +576,7 @@ if (isset($_POST['submit'])) {
 							. "\t\t" . 'return $row;' . PHP_EOL
 							. "\t" . '}' . PHP_EOL;
 
-	 		$mapper_content .= $find_function;
+	 		$mapper_content .= $find_function; 
 	 		$mapper_content .= $fetchAll_function;
    			
    			if ( isset($primary_key_name) ) {
