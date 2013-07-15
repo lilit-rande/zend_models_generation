@@ -1,4 +1,4 @@
-<html>
+ <html>
 	<title>Models / Mappers / DbTables </title>
 		<style> 
 			body {
@@ -172,13 +172,7 @@ function generateJSMessage($message) {
 }
 function mkDirectory($dirname) {
 	try {
-		if (is_array($dirname))  {
-			foreach ($dirname as $dir) {
-				if (!file_exists($dir )) { mkdir($dir); }  
-			}
-		} else {
-			if (!file_exists($dirname )) { mkdir($dirname); }  
-		}		
+		mkdir($dirname);
 	} catch (Exception $e) {
 		generateJSMessage($e->message);
 	}
@@ -247,8 +241,12 @@ if (isset($_POST['submit'])) {
 	get_include_path()
 	);
 
-	$directoryList = array(MODEL_GEN, DB_PATH, MODEL_PATH, DBTABLE_PATH, MAPPER_PATH);
-	mkDirectory($directoryList);
+	if (!file_exists(MODEL_GEN )) { mkDirectory(MODEL_GEN); }
+	if (!file_exists(DB_PATH )) { mkDirectory(DB_PATH); }
+	if (!file_exists(MODEL_PATH )) { mkDirectory(MODEL_PATH); }
+	if (!file_exists(DBTABLE_PATH)) { mkDirectory(DBTABLE_PATH); }
+	if (!file_exists(MAPPER_PATH)) { mkDirectory(MAPPER_PATH); }
+
 	try
 	{
 		// bdd connection params
@@ -261,7 +259,6 @@ if (isset($_POST['submit'])) {
 
 		$tables = $pdo->query("show tables");
 		$table_names = array();	
-		$table_desc = array();
 		
 		$matches = array();
 		$table_desc = array();
@@ -279,13 +276,13 @@ if (isset($_POST['submit'])) {
 		foreach ($table_names as $table_name) {
 
 			$table_desc[$table_name]['columns'] = array();
-			// $table_desc[$table_name]['phpType'] = array();
+			$table_desc[$table_name]['primary_keys'] = array();
 
 			$desc  = $pdo->query("DESCRIBE $table_name");
 			
 			$create_table_pdo = $pdo->query("SHOW CREATE TABLE $table_name");
 			$create_table_result = $create_table_pdo->fetchAll(PDO::FETCH_ASSOC);
-			$create_table_result = $create_table_result[0];	// array_values ???
+			$create_table_result = $create_table_result[0];
 		
 			foreach ($desc as $k => $v) {
 			
@@ -296,6 +293,7 @@ if (isset($_POST['submit'])) {
 				if ($v['Key'] == 'PRI' ) {
 					$primary_key = $v['Field'];
 					array_push($table_desc[$table_name]['columns'], array('name' => lcfirst(normalize_name($primary_key)), 'type' => $phpType, 'role' => 'primary', 'database_name' => $v['Field'] ));
+					array_push($table_desc[$table_name]['primary_keys'], $primary_key);
 				}
 				else if ($v['Key'] == 'MUL') {
 					$table_desc[$table_name]['references'] = array();
@@ -407,6 +405,19 @@ if (isset($_POST['submit'])) {
 
 		 	// the table name / primary key as protected variables
 	 		$dbtable_content .= "\tprotected $" . "_name = '" . $table_name . "';" . PHP_EOL;
+			
+			if (isset($table_desc[$table_name]['primary_keys']) && !empty($table_desc[$table_name]['primary_keys'])) {
+				
+				$dbtable_content .= "\tprotected $" . "_primary = ";
+
+				if ( count($table_desc[$table_name]['primary_keys']) == 1) {
+					$dbtable_content .= "'" . $table_desc[$table_name]['primary_keys'][0] . "';" . PHP_EOL;
+				} else {
+					$dbtable_content .= "array('";
+					$dbtable_content .= implode(', ', $table_desc[$table_name]['primary_keys']);
+					$dbtable_content .= "');" . PHP_EOL;
+				}
+			}
 
 	 		// MAPPERS
 			$mapper_content = "<?php" . PHP_EOL . "class Model_Mapper_" . $table_name . PHP_EOL . "{" . PHP_EOL 
@@ -449,9 +460,8 @@ if (isset($_POST['submit'])) {
 					 			. "\t\t" . '$this->' . $column_name . ' = ' . '$' . $column_name . ';' . PHP_EOL
 					 			. "\t}" . PHP_EOL;
 				
-				// dbtable protected variables
+			
 		 		if (isset($column['role']) && $column['role'] == 'primary') {
-		 			$dbtable_content .= "\tprotected $" . "_primary = '" . $column_name . "';" . PHP_EOL;
 		 			$primary_key_name = 'COL_' . strtoupper($column_db_name);
 		 			$primary_key = $column_name;
 		 		}
@@ -621,7 +631,7 @@ if (isset($_POST['submit'])) {
 				die ();
 	 		}
 	 	}
-	 	
+		
 	 	if ($model_creation_success) { appendJSMessage('Models has been successfully created at ' . MODEL_PATH); }
 	 	if ($mapper_creation_success) { appendJSMessage('Mappers has been successfully created at ' . MAPPER_PATH); }
 	 	if ($dbtable_creation_success) { appendJSMessage('DbTables has been successfully created at ' . DBTABLE_PATH); }
