@@ -1,4 +1,4 @@
- <html>
+<html>
 	<title>Models / Mappers / DbTables </title>
 		<style> 
 			body {
@@ -161,13 +161,15 @@
 <?php
 
 function appendJSMessage($message) {
+	$message = addslashes ($message);
 	echo '<script language="JavaScript" type="text/javascript">
-	document.getElementById("message").innerHTML += \'' . str_replace("'", "\'", $message) . ' <br />\';
+	document.getElementById("message").innerHTML += \'' . str_replace("'", "\'", $message) . ' <br /><br />\';
 	</script>';
 }
 function generateJSMessage($message) {
+	$message = addslashes ($message);
 	echo '<script language="JavaScript" type="text/javascript">
-	document.getElementById("message").innerHTML = \'' . str_replace("'", "\'", $message) . ' <br />\';
+	document.getElementById("message").innerHTML = \'' . str_replace("'", "\'", $message) . ' <br /><br />\';
 	</script>';
 }
 function mkDirectory($dirname) {
@@ -265,6 +267,7 @@ if (isset($_POST['submit'])) {
 
 		$has_references = false;
 		$has_dependences = false;
+
 
 		// generate table names array
 		foreach ($tables as $table) {
@@ -631,8 +634,8 @@ if (isset($_POST['submit'])) {
 				die ();
 	 		}
 	 	}
-		
-	 	if ($model_creation_success) { appendJSMessage('Models has been successfully created at ' . MODEL_PATH); }
+
+	 	if ($model_creation_success) { appendJSMessage( 'Models has been successfully created at ' . MODEL_PATH); }
 	 	if ($mapper_creation_success) { appendJSMessage('Mappers has been successfully created at ' . MAPPER_PATH); }
 	 	if ($dbtable_creation_success) { appendJSMessage('DbTables has been successfully created at ' . DBTABLE_PATH); }
 
